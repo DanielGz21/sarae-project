@@ -518,8 +518,9 @@ const RichTextEditor = ({ value, onChange, themeAccent }) => {
                 <div
                     ref={editorRef}
                     contentEditable
-                    onInput={e => onChange(e.currentTarget.innerHTML)}
-                    onBlur={e => onChange(e.currentTarget.innerHTML)}
+                    onInput={e => { onChange(e.currentTarget.innerHTML); if (props.onInteraction) props.onInteraction(); }}
+                    onBlur={e => { onChange(e.currentTarget.innerHTML); }}
+                    onFocus={() => { if (props.onInteraction) props.onInteraction(); }}
                     placeholder="Escribe lo que quieras recordar. Selecciona el texto y usa los controles arriba para dar formato avanzado..."
                     className="rich-text-content"
                     style={{
@@ -534,7 +535,7 @@ const RichTextEditor = ({ value, onChange, themeAccent }) => {
 };
 
 // ─── ADD MEMORY MODAL ─────────────────────────────────────────────────────────
-const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
+const AddMemoryModal = ({ isSara, onClose, onAdd, setTyping }) => {
     const [type, setType] = useState("note");
     const [title, setTitle] = useState("");
     const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -584,6 +585,8 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
     const submit = async () => {
         if (!title.trim() || !content.trim()) return;
         setUploading(true);
+        // Ensure typing stops when submitting
+        if (setTyping) setTyping(false);
 
         let media_url = null;
         if (file) {
@@ -652,12 +655,20 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
                     )}
 
                     <div>
-                        <input className="input-field" value={title} onChange={e => setTitle(e.target.value)} placeholder="El título de este recuerdo..." style={{ fontSize: 20, fontStyle: "italic", background: "transparent", border: "none", borderBottom: `1px solid rgba(255,255,255,0.1)`, padding: "8px 0", width: "100%", outline: "none", color: "white" }} />
+                        <input className="input-field" value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            onFocus={() => setTyping && setTyping(true)}
+                            onBlur={() => setTyping && setTimeout(() => setTyping(false), 2000)}
+                            placeholder="El título de este recuerdo..."
+                            style={{ fontSize: 20, fontStyle: "italic", background: "transparent", border: "none", borderBottom: `1px solid rgba(255,255,255,0.1)`, padding: "8px 0", width: "100%", outline: "none", color: "white" }} />
                     </div>
                     <div style={{ display: "flex", gap: 20 }}>
                         <div style={{ flex: 1 }}>
                             <label className="text-overline" style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>Fecha</label>
-                            <input className="input-field" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                            <input className="input-field" type="date" value={date}
+                                onChange={e => setDate(e.target.value)}
+                                onFocus={() => setTyping && setTyping(true)}
+                                onBlur={() => setTyping && setTimeout(() => setTyping(false), 2000)} />
                         </div>
                         <div style={{ flex: 1 }}>
                             <label className="text-overline" style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>Color de Aura</label>
@@ -673,7 +684,7 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
                         </div>
                     </div>
 
-                    <RichTextEditor value={content} onChange={setContent} themeAccent={themeAccent} />
+                    <RichTextEditor value={content} onChange={setContent} themeAccent={themeAccent} onInteraction={() => setTyping && setTyping(true)} />
 
                     <div style={{ display: "flex", gap: 20 }}>
                         <div style={{ flex: 1 }}>
@@ -949,63 +960,92 @@ const VitaeApp = ({ session, logout }) => {
     const [greeting, setGreeting] = useState(true);
     const [audioPlaying, setAudioPlaying] = useState(false);
     const [onlineOthers, setOnlineOthers] = useState(0);
+    const [othersTyping, setOthersTyping] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
     const [pingActive, setPingActive] = useState(false);
     const audioRef = useRef(null);
 
+    // ─── AUDIO ENGINE (CRYSTAL ECHO) ──────────────────────────────────────────
+    const playEcho = () => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 1);
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 1);
+        } catch (e) { }
+    };
+
     // ─── REALTIME & PRESENCE ──────────────────────────────────────────────────
+    const presenceChannel = useRef(null);
+
     useEffect(() => {
         if (!supabase) return;
 
         const channel = supabase.channel('sarae_presence', {
             config: { presence: { key: session.id } }
         });
+        presenceChannel.current = channel;
 
         channel
             .on('presence', { event: 'sync' }, () => {
                 const state = channel.presenceState();
-                const others = Object.keys(state).filter(id => id !== session.id.toString()).length;
-                setOnlineOthers(others);
+                const others = Object.values(state).flat().filter(p => p.id !== session.id);
+                setOnlineOthers(others.length);
+                setOthersTyping(others.some(p => p.isTyping));
             })
             .on('broadcast', { event: 'ping' }, () => {
                 setPingActive(true);
+                playEcho();
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                 setTimeout(() => setPingActive(false), 3000);
             })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.track({
-                        user: session.name,
-                        online_at: new Date().toISOString(),
-                    });
-                }
-            });
+            .subscribe();
 
         return () => { channel.unsubscribe(); };
     }, [session.id]);
 
+    // Track state changes (Typing)
+    useEffect(() => {
+        if (presenceChannel.current) {
+            presenceChannel.current.track({
+                id: session.id,
+                user: session.name,
+                isTyping: isTyping,
+                online_at: new Date().toISOString(),
+            });
+        }
+    }, [isTyping, session.id, session.name]);
+
     const sendPing = () => {
-        if (!supabase) return;
-        supabase.channel('sarae_presence').send({
+        if (!supabase || !presenceChannel.current) return;
+        presenceChannel.current.send({
             type: 'broadcast',
             event: 'ping',
             payload: { from: session.name }
         });
-        // Feedback visual para el emisor
         setPingActive(true);
         setTimeout(() => setPingActive(false), 1000);
     };
 
-    // Fetch from Supabase
+    // Fetch from Supabase (Delta Sync)
     useEffect(() => {
         const fetchMems = async () => {
             if (!supabase) {
-                // Fallback to localStorage if no supabase
                 const stored = JSON.parse(localStorage.getItem(`vitae_mem_${session.id}`));
                 setMemories(stored || (isSara ? INITIAL_MEMORIES : []));
                 setLoading(false);
                 return;
             }
 
+            // Delta sync: only fetch if memories are empty or on first load
             const { data, error } = await supabase
                 .from('memories')
                 .select('*')
@@ -1128,7 +1168,12 @@ const VitaeApp = ({ session, logout }) => {
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                             <span className="text-overline" style={{ color: "var(--text-muted)" }}>{isSara ? "De Sara Correa Montes" : "Libro de Vida"}</span>
                             {onlineOthers > 0 && (
-                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 10px #4ADE80", animation: "pulse 2s infinite" }} title="Luz conectada" />
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 10px #4ADE80", animation: "pulse 2s infinite" }} />
+                                    {othersTyping && (
+                                        <span className="text-overline" style={{ fontSize: 8, color: themeAccent, animation: "fadeInSlow 1s infinite alternate" }}>Creando...</span>
+                                    )}
+                                </div>
                             )}
                         </div>
                         {pingActive && (
@@ -1342,7 +1387,7 @@ const VitaeApp = ({ session, logout }) => {
             </div>
 
             {/* Modals */}
-            {addOpen && <AddMemoryModal isSara={isSara} onClose={() => setAddOpen(false)} onAdd={handleAdd} />}
+            {addOpen && <AddMemoryModal isSara={isSara} onClose={() => { setAddOpen(false); setIsTyping(false); }} onAdd={handleAdd} setTyping={setIsTyping} />}
             {aiOpen && <AiPanel isSara={isSara} memories={memories} onClose={() => setAiOpen(false)} />}
             {activeMem && <MemoryDetail memory={activeMem} isSara={isSara} onClose={() => setActiveId(null)} onDelete={handleDelete} />}
 
