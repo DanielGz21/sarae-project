@@ -7,6 +7,9 @@ const APP_NAME = "SARÆ";
 const GOLD = "#C9A96E";
 const ROSE = "#D4909A";
 const DARK = "#0A0708"; // New customized darker rich tone
+const SUPABASE_URL = "https://czsiswqjixuhkkzzkitw.supabase.co";
+const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY_AQUÍ";
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const INITIAL_MEMORIES = [
     { id: 1, date: "2026-01-14", title: "Un nuevo comienzo", type: "photo", tags: ["vida", "sueños"], excerpt: "El amanecer tiñó el cielo de un rosa suave. Sé que este año será diferente.", color: "#D4909A" },
@@ -504,18 +507,61 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
     const [content, setContent] = useState("");
     const [tagInput, setTagInput] = useState("");
     const [tags, setTags] = useState([]);
+    const [file, setFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
 
     const CONST_COLORS = isSara
         ? ["#D4909A", "#DEA4AD", "#C27A86", "#9E5B65", "#E4C3C8", "#9B8EA0", "#B2A4B8"] // Rose palette
         : ["#C9A96E", "#E8DCC8", "#8B9E7A", "#7A8BAA", "#9B8EA0", "#A0875E", "#836F52"]; // Standard palette
 
     const [color, setColor] = useState(CONST_COLORS[0]);
+    const fileInputRef = useRef(null);
 
     const addTag = () => { const t = tagInput.trim().toLowerCase(); if (t && !tags.includes(t)) setTags([...tags, t]); setTagInput(""); };
 
-    const submit = () => {
+    const uploadFile = async (file) => {
+        if (!supabase) return null;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError, data } = await supabase.storage
+            .from('media')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error("Upload error:", uploadError);
+            return null;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('media')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    };
+
+    const submit = async () => {
         if (!title.trim() || !content.trim()) return;
-        onAdd({ id: Date.now(), date, title, type, content, excerpt: content.slice(0, 140) + (content.length > 140 ? "..." : ""), tags, color });
+        setUploading(true);
+
+        let media_url = null;
+        if (file) {
+            media_url = await uploadFile(file);
+        }
+
+        onAdd({
+            id: Date.now(),
+            date,
+            title,
+            type,
+            content,
+            excerpt: content.replace(/<[^>]*>?/gm, '').slice(0, 140) + (content.length > 140 ? "..." : ""),
+            tags,
+            color,
+            media_url
+        });
+        setUploading(false);
         onClose();
     };
 
@@ -550,8 +596,23 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                    {/* Media Selector */}
+                    {(type === "photo" || type === "video") && (
+                        <div style={{ border: `2px dashed rgba(255,255,255,0.1)`, borderRadius: 8, padding: 32, textAlign: "center", cursor: "pointer", position: "relative" }} onClick={() => fileInputRef.current.click()}>
+                            <input type="file" ref={fileInputRef} hidden accept={type === "photo" ? "image/*" : "video/*"} onChange={e => setFile(e.target.files[0])} />
+                            {file ? (
+                                <p style={{ color: themeAccent, fontSize: 13 }}>{file.name} seleccionado (Haz clic para cambiar)</p>
+                            ) : (
+                                <div style={{ opacity: 0.6 }}>
+                                    <Icon name={type} size={32} style={{ marginBottom: 12 }} />
+                                    <p className="text-overline">Haz clic para subir {type === "photo" ? "una foto" : "un video"}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <div>
-                        <input className="input-field" value={title} onChange={e => setTitle(e.target.value)} placeholder="El título de este recuerdo..." style={{ fontSize: 20, fontStyle: "italic", background: "transparent", borderBottomOnly: true, border: "none", borderBottom: `1px solid rgba(255,255,255,0.1)`, padding: "8px 0" }} />
+                        <input className="input-field" value={title} onChange={e => setTitle(e.target.value)} placeholder="El título de este recuerdo..." style={{ fontSize: 20, fontStyle: "italic", background: "transparent", border: "none", borderBottom: `1px solid rgba(255,255,255,0.1)`, padding: "8px 0", width: "100%", outline: "none", color: "white" }} />
                     </div>
                     <div style={{ display: "flex", gap: 20 }}>
                         <div style={{ flex: 1 }}>
@@ -595,14 +656,15 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 16, marginTop: 40 }}>
-                    <button onClick={onClose} className="btn-ghost">Cancelar</button>
-                    <button onClick={submit} className={`btn-primary ${themeClass}`}>Guardar Memoria</button>
+                    <button onClick={onClose} className="btn-ghost" disabled={uploading}>Cancelar</button>
+                    <button onClick={submit} className={`btn-primary ${themeClass}`} disabled={uploading}>
+                        {uploading ? "Subiendo..." : "Guardar Memoria"}
+                    </button>
                 </div>
             </div>
         </div>
     );
 };
-
 // ─── AI REFLECTION PANEL (THE ORACLE) ─────────────────────────────────────────
 const AiPanel = ({ isSara, memories, onClose }) => {
     const [query, setQuery] = useState("");
@@ -696,19 +758,28 @@ const MemoryDetail = ({ memory, isSara, onClose, onDelete }) => {
 
                 {/* Header Art / Color Block */}
                 <div style={{
-                    height: 220, position: "relative",
+                    height: 320, position: "relative",
                     background: `linear-gradient(135deg, ${memory.color}30, ${memory.color}10)`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    borderBottom: `1px solid ${memory.color}20`
+                    borderBottom: `1px solid ${memory.color}20`,
+                    overflow: "hidden"
                 }}>
-                    <span style={{ color: memory.color, opacity: 0.3, fontSize: 80, filter: "blur(2px)" }}>
-                        <Icon name={memory.type} size={100} />
-                    </span>
-                    <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 16 }}>
+                    {memory.media_url ? (
+                        memory.type === "video" ? (
+                            <video src={memory.media_url} controls style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                            <img src={memory.media_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        )
+                    ) : (
+                        <span style={{ color: memory.color, opacity: 0.3, fontSize: 80, filter: "blur(2px)" }}>
+                            <Icon name={memory.type} size={100} />
+                        </span>
+                    )}
+
+                    <div style={{ position: "absolute", top: 24, right: 24, display: "flex", gap: 16, zIndex: 10 }}>
                         {onDelete && <button onClick={() => onDelete(memory.id)} style={{ color: "var(--text-main)", background: "rgba(0,0,0,0.3)", borderRadius: "50%", padding: 10, backdropFilter: "blur(4px)" }}><Icon name="trash" size={16} /></button>}
                         <button onClick={onClose} style={{ color: "var(--text-main)", background: "rgba(0,0,0,0.3)", borderRadius: "50%", padding: 10, backdropFilter: "blur(4px)" }}><Icon name="close" size={16} /></button>
                     </div>
-                    <div style={{ position: "absolute", bottom: -20, left: 40, width: 60, height: 60, borderRadius: "50%", background: memory.color, border: "6px solid var(--bg-modal)", boxShadow: `0 0 30px ${memory.color}50` }} />
                 </div>
 
                 <div style={{ padding: "40px" }}>
@@ -828,13 +899,8 @@ const VitaeApp = ({ session, logout }) => {
     const themeClass = isSara ? "theme-sara" : "theme-standard";
     const themeAccent = isSara ? "var(--rose)" : "var(--gold)";
 
-    const [memories, setMemories] = useState(() => {
-        try {
-            const stored = JSON.parse(localStorage.getItem(`vitae_mem_${session.id}`));
-            return stored || (isSara ? INITIAL_MEMORIES : []);
-        } catch { return isSara ? INITIAL_MEMORIES : []; }
-    });
-
+    const [memories, setMemories] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [view, setView] = useState("timeline");
     const [activeId, setActiveId] = useState(null);
     const [addOpen, setAddOpen] = useState(false);
@@ -844,11 +910,45 @@ const VitaeApp = ({ session, logout }) => {
     const [audioPlaying, setAudioPlaying] = useState(false);
     const audioRef = useRef(null);
 
+    // Fetch from Supabase
+    useEffect(() => {
+        const fetchMems = async () => {
+            if (!supabase) {
+                // Fallback to localStorage if no supabase
+                const stored = JSON.parse(localStorage.getItem(`vitae_mem_${session.id}`));
+                setMemories(stored || (isSara ? INITIAL_MEMORIES : []));
+                setLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('memories')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (data) setMemories(data);
+            setLoading(false);
+        };
+
+        fetchMems();
+
+        // Real-time subscription
+        let subscription;
+        if (supabase) {
+            subscription = supabase
+                .channel('public:memories')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, payload => {
+                    fetchMems();
+                })
+                .subscribe();
+        }
+
+        return () => { if (subscription) supabase.removeChannel(subscription); };
+    }, [session.id]);
+
     useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
 
     useEffect(() => {
-        // Creating a subtle ambient sound using browser AudioContext logic (or just a silent placeholder)
-        // Usually we would embed a direct mp3 link here, but since we are doing 100% code, I will stub this to avoid 404s.
         audioRef.current = new Audio("data:audio/mp3;base64,");
         audioRef.current.loop = true;
     }, []);
@@ -860,9 +960,39 @@ const VitaeApp = ({ session, logout }) => {
         setAudioPlaying(!audioPlaying);
     };
 
-    const saveMems = m => { setMemories(m); localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(m)); };
-    const handleAdd = m => saveMems([m, ...memories].sort((a, b) => new Date(b.date) - new Date(a.date)));
-    const handleDelete = id => { setActiveId(null); saveMems(memories.filter(x => x.id !== id)); };
+    const handleAdd = async (m) => {
+        // Save to state immediately for UX
+        const newMems = [m, ...memories].sort((a, b) => new Date(b.date) - new Date(a.date));
+        setMemories(newMems);
+
+        if (supabase) {
+            const { error } = await supabase.from('memories').insert([{
+                date: m.date,
+                title: m.title,
+                content: m.content,
+                type: m.type,
+                tags: m.tags,
+                color: m.color,
+                media_url: m.media_url,
+                user_id: session.id
+            }]);
+            if (error) console.error("Error saving to Supabase:", error);
+        } else {
+            localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(newMems));
+        }
+    };
+
+    const handleDelete = async (id) => {
+        setActiveId(null);
+        if (supabase) {
+            const { error } = await supabase.from('memories').delete().eq('id', id);
+            if (error) console.error("Error deleting from Supabase:", error);
+        } else {
+            const newMems = memories.filter(x => x.id !== id);
+            setMemories(newMems);
+            localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(newMems));
+        }
+    };
 
     const exportData = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(memories, null, 2));
@@ -1001,6 +1131,17 @@ const VitaeApp = ({ session, logout }) => {
                                             <h3 style={{ fontSize: 22, fontStyle: "italic", color: "#E8E3DF" }}>{m.title}</h3>
                                             <Icon name={m.type} size={16} color={m.color} style={{ opacity: 0.8 }} />
                                         </div>
+                                        {m.media_url && (
+                                            <div style={{ width: "100%", height: 120, borderRadius: 4, overflow: "hidden", marginBottom: 16, background: "rgba(255,255,255,0.03)" }}>
+                                                {m.type === "photo" ? (
+                                                    <img src={m.media_url} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.8 }} />
+                                                ) : (
+                                                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: `${m.color}10` }}>
+                                                        <Icon name="video" size={32} color={m.color} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                         <p style={{ fontSize: 15, color: "var(--text-muted)", lineHeight: 1.8, fontStyle: "italic", marginBottom: 20 }}>
                                             {m.excerpt}
                                         </p>
@@ -1019,9 +1160,23 @@ const VitaeApp = ({ session, logout }) => {
                 {view === "galería" && (
                     <div className="masonry-grid fade-in">
                         {filtered.map((m, i) => (
-                            <div key={m.id} className="masonry-item memory-card" onClick={() => setActiveId(m.id)} style={{ padding: "24px", minHeight: (i % 3 === 0) ? 280 : 200, display: "flex", flexDirection: "column", justifyContent: "flex-end", background: `linear-gradient(160deg, var(--bg-card), ${m.color}15)` }}>
-                                <div style={{ position: "absolute", top: 20, right: 20, opacity: 0.5 }}><Icon name={m.type} size={16} color={m.color} /></div>
-                                <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='${m.color.replace('#', '%23')}' fill-opacity='0.1'/%3E%3C/svg%3E")`, pointerEvents: "none" }} />
+                            <div key={m.id} className="masonry-item memory-card" onClick={() => setActiveId(m.id)} style={{
+                                padding: "24px",
+                                minHeight: (i % 3 === 0) ? 280 : 200,
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "flex-end",
+                                background: m.media_url && m.type === 'photo'
+                                    ? `linear-gradient(to top, rgba(10,7,8,0.9), transparent), url(${m.media_url}) center/cover no-repeat`
+                                    : `linear-gradient(160deg, var(--bg-card), ${m.color}15)`,
+                                position: "relative",
+                                overflow: "hidden"
+                            }}>
+                                {m.media_url && m.type === 'video' && (
+                                    <video src={m.media_url} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.3, zIndex: 0 }} muted loop onMouseOver={e => e.target.play()} onMouseOut={e => e.target.pause()} />
+                                )}
+                                <div style={{ position: "absolute", top: 20, right: 20, opacity: 0.5, zIndex: 2 }}><Icon name={m.type} size={16} color={m.color} /></div>
+                                <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='2' cy='2' r='1' fill='${m.color.replace('#', '%23')}' fill-opacity='0.1'/%3E%3C/svg%3E")`, pointerEvents: "none", zIndex: 1 }} />
                                 <div style={{ zIndex: 2 }}>
                                     <p className="text-overline" style={{ color: m.color, marginBottom: 8, opacity: 0.8 }}>
                                         {new Date(m.date).toLocaleDateString("es", { day: "numeric", month: "long" })}
