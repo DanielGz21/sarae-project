@@ -948,7 +948,52 @@ const VitaeApp = ({ session, logout }) => {
     const [search, setSearch] = useState("");
     const [greeting, setGreeting] = useState(true);
     const [audioPlaying, setAudioPlaying] = useState(false);
+    const [onlineOthers, setOnlineOthers] = useState(0);
+    const [pingActive, setPingActive] = useState(false);
     const audioRef = useRef(null);
+
+    // ─── REALTIME & PRESENCE ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (!supabase) return;
+
+        const channel = supabase.channel('sarae_presence', {
+            config: { presence: { key: session.id } }
+        });
+
+        channel
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
+                const others = Object.keys(state).filter(id => id !== session.id.toString()).length;
+                setOnlineOthers(others);
+            })
+            .on('broadcast', { event: 'ping' }, () => {
+                setPingActive(true);
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                setTimeout(() => setPingActive(false), 3000);
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({
+                        user: session.name,
+                        online_at: new Date().toISOString(),
+                    });
+                }
+            });
+
+        return () => { channel.unsubscribe(); };
+    }, [session.id]);
+
+    const sendPing = () => {
+        if (!supabase) return;
+        supabase.channel('sarae_presence').send({
+            type: 'broadcast',
+            event: 'ping',
+            payload: { from: session.name }
+        });
+        // Feedback visual para el emisor
+        setPingActive(true);
+        setTimeout(() => setPingActive(false), 1000);
+    };
 
     // Fetch from Supabase
     useEffect(() => {
@@ -1078,9 +1123,22 @@ const VitaeApp = ({ session, logout }) => {
             {/* Header */}
             <header style={{ position: "relative", zIndex: 50, borderBottom: "1px solid var(--border-subtle)", background: "rgba(10,7,8,0.6)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
                 <div className="container header-content" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 80 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 16, cursor: "pointer" }} onClick={() => setView("timeline")}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 16, cursor: "pointer", position: "relative" }} onClick={() => { setView("timeline"); sendPing(); }}>
                         <span className={isSara ? "shimmer-text-rose" : "shimmer-text-gold"} style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, letterSpacing: "0.2em" }}>{APP_NAME}</span>
-                        <span className="text-overline" style={{ color: "var(--text-muted)" }}>{isSara ? "De Sara Correa Montes" : "Libro de Vida"}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span className="text-overline" style={{ color: "var(--text-muted)" }}>{isSara ? "De Sara Correa Montes" : "Libro de Vida"}</span>
+                            {onlineOthers > 0 && (
+                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 10px #4ADE80", animation: "pulse 2s infinite" }} title="Luz conectada" />
+                            )}
+                        </div>
+                        {pingActive && (
+                            <div style={{
+                                position: "absolute", inset: -10, borderRadius: "50%",
+                                border: `2px solid ${themeAccent}`,
+                                animation: "pingAnimation 1.5s ease-out forwards",
+                                pointerEvents: "none"
+                            }} />
+                        )}
                     </div>
 
                     <nav style={{ display: "flex", gap: 32, display: "none" }} className="desktop-nav">
