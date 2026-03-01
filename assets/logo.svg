@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="rose-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4909A" />
+      <stop offset="100%" stop-color="#C9A96E" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#D4909A" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#D4909A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0A0708" rx="120" />
+  
+  <circle cx="256" cy="256" r="180" fill="url(#glow)" />
+  <circle cx="256" cy="256" r="160" fill="none" stroke="url(#rose-gold)" stroke-width="4" stroke-dasharray="8 12" />
+  
+  <!-- Elegant intertwining SARÆ Monogram (S and AE ligature concept) -->
+  <path d="M 280 160 C 230 160, 180 200, 256 256 C 332 312, 280 352, 230 352" fill="none" stroke="url(#rose-gold)" stroke-width="12" stroke-linecap="round" />
+  
+  <path d="M 180 256 L 332 256 M 256 180 L 256 332" fill="none" stroke="#C9A96E" stroke-width="2" stroke-dasharray="4 4" opacity="0.4" />
+  
+  <!-- Stars -->
+  <circle cx="256" cy="256" r="6" fill="#E8E3DF" />
+  <circle cx="340" cy="170" r="4" fill="#D4909A" />
+  <circle cx="170" cy="340" r="4" fill="#C9A96E" />
+</svg>
