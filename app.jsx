@@ -453,6 +453,40 @@ const RichTextEditor = ({ value, onChange, themeAccent }) => {
         }
     }, []);
 
+    // ─── UTILITIES: IMAGE COMPRESSION ──────────────────────────────────────────
+    const compressImage = (file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    const MAX_WIDTH = 1200;
+                    const MAX_HEIGHT = 1200;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    } else {
+                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
+                    }, "image/jpeg", 0.7); // 70% quality jpeg
+                };
+            };
+        });
+    };
+
     const exec = (command) => {
         document.execCommand(command, false, null);
         editorRef.current.focus();
@@ -521,13 +555,19 @@ const AddMemoryModal = ({ isSara, onClose, onAdd }) => {
 
     const uploadFile = async (file) => {
         if (!supabase) return null;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
+
+        let fileToUpload = file;
+        if (file.type.startsWith("image/")) {
+            fileToUpload = await compressImage(file);
+        }
+
+        const fileExt = fileToUpload.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError, data } = await supabase.storage
             .from('media')
-            .upload(filePath, file);
+            .upload(filePath, fileToUpload);
 
         if (uploadError) {
             console.error("Upload error:", uploadError);
@@ -1097,8 +1137,19 @@ const VitaeApp = ({ session, logout }) => {
                     </p>
                 </div>
 
-                {/* ── TIMELINE VIEW ── */}
-                {view === "timeline" && (
+                {loading && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="memory-card" style={{ height: 160, opacity: 0.3, animation: "pulseGlow 2s infinite" }}>
+                                <div style={{ height: 20, width: "40%", background: themeAccent, borderRadius: 4, marginBottom: 16 }} />
+                                <div style={{ height: 14, width: "80%", background: "rgba(255,255,255,0.1)", borderRadius: 4, marginBottom: 8 }} />
+                                <div style={{ height: 14, width: "60%", background: "rgba(255,255,255,0.1)", borderRadius: 4 }} />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {!loading && view === "timeline" && (
                     <div style={{ position: "relative" }} className="fade-in">
                         <div className="timeline-line"></div>
 
@@ -1157,7 +1208,7 @@ const VitaeApp = ({ session, logout }) => {
                 )}
 
                 {/* ── GALLERY VIEW ── */}
-                {view === "galería" && (
+                {!loading && view === "galería" && (
                     <div className="masonry-grid fade-in">
                         {filtered.map((m, i) => (
                             <div key={m.id} className="masonry-item memory-card" onClick={() => setActiveId(m.id)} style={{
@@ -1189,7 +1240,7 @@ const VitaeApp = ({ session, logout }) => {
                     </div>
                 )}
                 {/* ── ATLAS VIEW ── */}
-                {view === "atlas" && <AtlasView memories={filtered} isSara={isSara} />}
+                {!loading && view === "atlas" && <AtlasView memories={filtered} isSara={isSara} />}
 
             </main>
 
