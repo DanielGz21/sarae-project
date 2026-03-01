@@ -8,7 +8,7 @@ const GOLD = "#C9A96E";
 const ROSE = "#D4909A";
 const DARK = "#0A0708"; // New customized darker rich tone
 const SUPABASE_URL = "https://czsiswqjixuhkkzzkitw.supabase.co";
-const SUPABASE_KEY = "TU_SUPABASE_ANON_KEY_AQUÍ";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6c2lzd3FqaXh1aGtrenpraXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MDQzNjYsImV4cCI6MjA4Nzk4MDM2Nn0.zrfLJxHiSXkHajVDh2S7sk5RyymGoVEU8nLSPR8jZAA";
 const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 const INITIAL_MEMORIES = [
