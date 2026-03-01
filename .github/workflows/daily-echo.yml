@@ -1,0 +1,26 @@
+name: SARÆ Daily Echo
+on:
+  schedule:
+    - cron: '0 13 * * *' # 8:00 AM COT (UTC-5) -> 13:00 UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install @supabase/supabase-js
+
+      - name: Run Daily Echo Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node .github/scripts/daily_echo.js

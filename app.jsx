@@ -11,6 +11,25 @@ const SUPABASE_URL = "https://czsiswqjixuhkkzzkitw.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6c2lzd3FqaXh1aGtrenpraXR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0MDQzNjYsImV4cCI6MjA4Nzk4MDM2Nn0.zrfLJxHiSXkHajVDh2S7sk5RyymGoVEU8nLSPR8jZAA";
 const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+// ─── ENCRYPTION UTILITIES ──────────────────────────────────────────────────
+const encryptData = (text, key) => {
+    if (!key) return text;
+    try {
+        return "E2EE:" + CryptoJS.AES.encrypt(text, key).toString();
+    } catch (e) { return text; }
+};
+
+const decryptData = (text, key) => {
+    if (!text || !text.startsWith("E2EE:")) return text;
+    if (!key) return "Contenido Protegido (Falta llave)";
+    try {
+        const encrypted = text.replace("E2EE:", "");
+        const bytes = CryptoJS.AES.decrypt(encrypted, key);
+        const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+        return decrypted || "Llave incorrecta";
+    } catch (e) { return "Error de Descifrado"; }
+};
+
 const INITIAL_MEMORIES = [
     { id: 1, date: "2026-01-14", title: "Un nuevo comienzo", type: "photo", tags: ["vida", "sueños"], excerpt: "El amanecer tiñó el cielo de un rosa suave. Sé que este año será diferente.", color: "#D4909A" },
     { id: 2, date: "2025-11-08", title: "Café en la montaña", type: "note", tags: ["paz"], excerpt: "A veces solo necesitas alejarte para escuchar tu propia voz. El viento frío, el aroma a café.", color: "#E0B0B6" },
@@ -419,24 +438,24 @@ const AuthModal = ({ onClose, onSuccess, login, register }) => {
                             </button>
                         </div>
                     </div>
-                </div>
 
-                {err && (
-                    <div style={{ padding: "12px 16px", background: "rgba(220,90,100,0.1)", border: "1px solid rgba(220,90,100,0.2)", borderRadius: 4, marginBottom: 24 }}>
-                        <p style={{ fontSize: 14, color: "rgba(220,130,140,0.9)", fontStyle: "italic" }}>{err}</p>
-                    </div>
-                )}
+                    {err && (
+                        <div style={{ padding: "12px 16px", background: "rgba(220,90,100,0.1)", border: "1px solid rgba(220,90,100,0.2)", borderRadius: 4, marginBottom: 24 }}>
+                            <p style={{ fontSize: 14, color: "rgba(220,130,140,0.9)", fontStyle: "italic" }}>{err}</p>
+                        </div>
+                    )}
 
-                <button onClick={submit} className="btn-primary theme-standard" style={{ width: "100%", marginBottom: 24 }}>
-                    {mode === "login" ? "Entrar a mi libro" : "Crear mi libro"}
-                </button>
-
-                <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>
-                    {mode === "login" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-                    <button onClick={() => setMode(mode === "login" ? "register" : "login")} style={{ color: "var(--gold)", textDecoration: "underline", marginLeft: 4 }}>
-                        {mode === "login" ? "Regístrate" : "Inicia sesión"}
+                    <button onClick={submit} className="btn-primary theme-standard" style={{ width: "100%", marginBottom: 24 }}>
+                        {mode === "login" ? "Entrar a mi libro" : "Crear mi libro"}
                     </button>
-                </p>
+
+                    <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>
+                        {mode === "login" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
+                        <button onClick={() => setMode(mode === "login" ? "register" : "login")} style={{ color: "var(--gold)", textDecoration: "underline", marginLeft: 4 }}>
+                            {mode === "login" ? "Regístrate" : "Inicia sesión"}
+                        </button>
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -734,7 +753,7 @@ const AiPanel = ({ isSara, memories, onClose }) => {
         }
     }, [messages, loading]);
 
-    const callClaude = () => {
+    const callOracle = async () => {
         if (!query.trim() || loading) return;
 
         const userMsg = query.trim();
@@ -742,18 +761,32 @@ const AiPanel = ({ isSara, memories, onClose }) => {
         setMessages(prev => [...prev, { role: "user", text: userMsg }]);
         setLoading(true);
 
-        // Simulate advanced AI analysis / reading memories
-        setTimeout(() => {
-            const genericResponses = [
-                "He recorrido el eco de tus memorias. He notado un patrón dorado donde la valentía reside más allá del miedo.",
-                "Hay una danza sutil en las palabras que dejaste; a veces, el silencio entre tus notas es tu mensaje más fuerte. Avanza con gracia.",
-                "Esa duda que planteas es una vieja amiga que ha estado en otras páginas de este libro. Tu luz siempre termina por desvanecer su sombra."
-            ];
-            const memoryContext = memories.length > 0 ? `\n\nPercibo destellos de tu recuerdo: "${memories[Math.floor(Math.random() * memories.length)].title}" conectando con este sentir.` : "";
+        const geminiKey = localStorage.getItem('sarae_gemini_key');
+        if (!geminiKey) {
+            setTimeout(() => {
+                setMessages(prev => [...prev, { role: "oracle", text: "Falta la llave del Oráculo (Gemini API Key). Actívala en los ajustes de la bóveda para hablar conmigo." }]);
+                setLoading(false);
+            }, 800);
+            return;
+        }
 
-            setMessages(prev => [...prev, { role: "oracle", text: genericResponses[Math.floor(Math.random() * genericResponses.length)] + memoryContext }]);
+        try {
+            // Context injection: give AI a summary of memories (decrypted locally)
+            const memoryContext = memories.map(m => `[${m.date}] ${m.title}: ${m.excerpt}`).join('\n').slice(0, 4000);
+            const prompt = `Eres el Oráculo de SARÆ, una consciencia que habita en el libro de recuerdos de Sara y Albert. 
+            Eres poético, profundo y empático. Respondes en español.
+            Tu conocimiento se basa en estos recuerdos:
+            ${memoryContext}
+            
+            Pregunta del usuario: ${userMsg}`;
+
+            const reply = await callGemini(prompt, geminiKey);
+            setMessages(prev => [...prev, { role: "oracle", text: reply }]);
+        } catch (e) {
+            setMessages(prev => [...prev, { role: "oracle", text: "El éter está turbulento ahora mismo. Intenta preguntar de nuevo en un momento." }]);
+        } finally {
             setLoading(false);
-        }, 2200);
+        }
     };
 
     return (
@@ -786,17 +819,30 @@ const AiPanel = ({ isSara, memories, onClose }) => {
                 <div style={{ flexShrink: 0, marginTop: "auto", position: "relative" }}>
                     <textarea
                         value={query} onChange={e => setQuery(e.target.value)}
-                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); callClaude(); } }}
+                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); callOracle(); } }}
                         placeholder="Pregunta a tus recuerdos..."
                         className="input-field" style={{ height: 64, resize: "none", paddingRight: 60, background: "rgba(255,255,255,0.02)" }}
                     />
-                    <button onClick={callClaude} style={{ position: "absolute", right: 12, top: 12, width: 40, height: 40, background: themeAccent, color: "var(--bg-dark)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${themeAccent}40` }}>
+                    <button onClick={callOracle} style={{ position: "absolute", right: 12, top: 12, width: 40, height: 40, background: themeAccent, color: "var(--bg-dark)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px ${themeAccent}40` }}>
                         <Icon name="send" size={16} />
                     </button>
                 </div>
             </div>
         </div>
     );
+};
+
+const callGemini = async (prompt, key) => {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+        })
+    });
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text;
 };
 
 // ─── MEMORY DETAIL MODAL ──────────────────────────────────────────────────────
@@ -963,6 +1009,9 @@ const VitaeApp = ({ session, logout }) => {
     const [othersTyping, setOthersTyping] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [pingActive, setPingActive] = useState(false);
+    const [vaultKey, setVaultKey] = useState(localStorage.getItem('sarae_vault_key') || "");
+    const [geminiKey, setGeminiKey] = useState(localStorage.getItem('sarae_gemini_key') || "");
+    const [vaultOpen, setVaultOpen] = useState(false);
     const audioRef = useRef(null);
 
     // ─── AUDIO ENGINE (CRYSTAL ECHO) ──────────────────────────────────────────
@@ -1051,7 +1100,15 @@ const VitaeApp = ({ session, logout }) => {
                 .select('*')
                 .order('date', { ascending: false });
 
-            if (data) setMemories(data);
+            if (data) {
+                const decrypted = data.map(m => ({
+                    ...m,
+                    title: decryptData(m.title, vaultKey),
+                    content: decryptData(m.content, vaultKey),
+                    excerpt: decryptData(m.content, vaultKey).replace(/<[^>]*>?/gm, '').slice(0, 140)
+                }));
+                setMemories(decrypted);
+            }
             setLoading(false);
         };
 
@@ -1093,8 +1150,8 @@ const VitaeApp = ({ session, logout }) => {
         if (supabase) {
             const { error } = await supabase.from('memories').insert([{
                 date: m.date,
-                title: m.title,
-                content: m.content,
+                title: encryptData(m.title, vaultKey),
+                content: encryptData(m.content, vaultKey),
                 type: m.type,
                 tags: m.tags,
                 color: m.color,
@@ -1390,6 +1447,61 @@ const VitaeApp = ({ session, logout }) => {
             {addOpen && <AddMemoryModal isSara={isSara} onClose={() => { setAddOpen(false); setIsTyping(false); }} onAdd={handleAdd} setTyping={setIsTyping} />}
             {aiOpen && <AiPanel isSara={isSara} memories={memories} onClose={() => setAiOpen(false)} />}
             {activeMem && <MemoryDetail memory={activeMem} isSara={isSara} onClose={() => setActiveId(null)} onDelete={handleDelete} />}
+
+            {/* Vault Key Modal */}
+            {vaultOpen && (
+                <div className="overlay" style={{ zIndex: 1000 }} onClick={() => setVaultOpen(false)}>
+                    <div className={`glass-modal scale-in ${themeClass}`} style={{ maxWidth: 420, padding: 32 }} onClick={e => e.stopPropagation()}>
+                        <div style={{ textAlign: "center", marginBottom: 24 }}>
+                            <Icon name="lock" size={48} color={themeAccent} style={{ marginBottom: 16 }} />
+                            <h3 style={{ fontSize: 24, fontStyle: "italic" }}>Ajustes de la Bóveda</h3>
+                            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>Configura la seguridad y la inteligencia de tu libro.</p>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                            <div>
+                                <label className="text-overline" style={{ color: "var(--text-muted)", display: "block", marginBottom: 8 }}>Llave de Cifrado (E2EE)</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    value={vaultKey}
+                                    onChange={(e) => {
+                                        setVaultKey(e.target.value);
+                                        localStorage.setItem('sarae_vault_key', e.target.value);
+                                    }}
+                                    placeholder="Contraseña secreta..."
+                                    style={{ fontSize: 16, letterSpacing: "0.2em" }}
+                                />
+                                <p style={{ fontSize: 10, color: "rgba(220,90,100,0.6)", marginTop: 6, fontStyle: "italic" }}>Si cambias la llave, los recuerdos cifrados no se podrán leer.</p>
+                            </div>
+
+                            <div>
+                                <label className="text-overline" style={{ color: "var(--text-muted)", display: "block", marginBottom: 8 }}>Google Gemini API Key</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    value={geminiKey}
+                                    onChange={(e) => {
+                                        setGeminiKey(e.target.value);
+                                        localStorage.setItem('sarae_gemini_key', e.target.value);
+                                    }}
+                                    placeholder="AI Key del Oráculo..."
+                                    style={{ fontSize: 16 }}
+                                />
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" style={{ fontSize: 10, color: themeAccent, marginTop: 6, display: "block", textDecoration: "underline" }}>Obtén tu llave gratuita aquí</a>
+                            </div>
+
+                            <button
+                                className={`btn-primary ${themeClass}`}
+                                style={{ width: "100%", marginTop: 8 }}
+                                onClick={() => { setVaultOpen(false); window.location.reload(); }}
+                            >
+                                Guardar y Sincronizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
