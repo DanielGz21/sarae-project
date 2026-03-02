@@ -3,8 +3,8 @@ const { useState, useEffect, useRef, useCallback } = React;
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const SECRET_NAME = "Sara Correa Montes";
 const SECRET_KEY = "sara_correa_montes_vitae_2026";
-const ALBERT_NAME = "Albert Galvis";
-const ALBERT_KEY = "albert_galvis_vitae_2026";
+const ALBERT_NAME = "Albert Gaviria Zapata";
+const ALBERT_KEY = "albert_gaviria_zapata_vitae_2026";
 const APP_NAME = "SARÆ";
 const GOLD = "#C9A96E";
 const ROSE = "#D4909A";
@@ -312,7 +312,7 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
             subtitle: "Escribe tu nombre para desvelar tu destino...",
             checker: s => {
                 const n = s.toLowerCase().replace(/\s+/g, "");
-                return n === "saracorreamontes" || n === "albertgalvis";
+                return n === "saracorreamontes" || n === "albertgaviriazapata";
             },
             placeholder: "Tu nombre aquí..."
         },
