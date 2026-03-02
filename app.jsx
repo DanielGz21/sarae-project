@@ -305,7 +305,7 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
         },
         {
             title: "El Latido de la Tierra",
-            subtitle: "Solita, Caquetá — El despertar de una nueva fuerza (DD/MM/AAAA)",
+            subtitle: "Florencia, Caquetá — El despertar de una nueva fuerza (DD/MM/AAAA)",
             checker: s => s.replace(/[-/.\s]/g, "") === "11122009" || s.replace(/[-/.\s]/g, "") === "111209",
             placeholder: "DD-MM-YYYY"
         },
