@@ -293,7 +293,9 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
             title: "El Origen de su Luz",
             subtitle: (firstValue) => {
                 const isSaraFlow = firstValue.toLowerCase().includes("sara");
-                return isSaraFlow ? "Medellín, Antioquia — El día en que el cielo se tiñó (DD/MM/AAAA)" : "Florencia, Caquetá — El día en que el cielo se tiñó (DD/MM/AAAA)";
+                return isSaraFlow
+                    ? "Medellín, Antioquia — El día en que el cielo se tiñó (DD/MM/AAAA)"
+                    : "Florencia, Caquetá — El día en que el cielo se tiñó (DD/MM/AAAA)";
             },
             checker: (s, firstValue) => {
                 const isSaraFlow = firstValue.toLowerCase().includes("sara");
@@ -372,7 +374,9 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
                         <h2 style={{ fontSize: 38, fontStyle: "italic", color: "#E8E3DF", lineHeight: 1.2, marginBottom: 16, textShadow: "0 0 20px rgba(232,227,223,0.1)" }}>
                             {puzzle[step].title}
                         </h2>
-                        <p style={{ color: "rgba(232,227,223,0.5)", fontStyle: "italic", fontSize: 16, maxWidth: "80%", margin: "0 auto" }}>{puzzle[step].subtitle}</p>
+                        <p style={{ color: "rgba(232,227,223,0.5)", fontStyle: "italic", fontSize: 16, maxWidth: "80%", margin: "0 auto" }}>
+                            {typeof puzzle[step].subtitle === 'function' ? puzzle[step].subtitle(firstInput) : puzzle[step].subtitle}
+                        </p>
                     </div>
 
                     <div style={{
