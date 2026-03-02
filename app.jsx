@@ -258,32 +258,37 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
     // Advanced 5-stage enigma unlock sequence tailored for Sara and Albert
     const puzzle = [
         {
-            title: "¿Quién busca desvelar el universo?",
-            subtitle: "escribe tu nombre para acceder",
-            checker: s => s.toLowerCase().replace(/\s+/g, "") === "saracorreamontes"
+            title: "¿Quién custodia esta esencia?",
+            subtitle: "Invoca tu nombre completo para despertar el éter...",
+            checker: s => s.toLowerCase().replace(/\s+/g, "") === "saracorreamontes",
+            placeholder: "Tu nombre aquí..."
         },
         {
             title: "El Origen de su Luz",
-            subtitle: "Medellín, Antioquia (DD/MM/YYYY)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "21092002" || s.replace(/[-/.\s]/g, "") === "210902" || s.replace(/[-/.\s]/g, "") === "020921"
+            subtitle: "Medellín, Antioquia — El día en que el cielo se tiñó de rosa (DD/MM/AAAA)",
+            checker: s => s.replace(/[-/.\s]/g, "") === "21092002" || s.replace(/[-/.\s]/g, "") === "210902" || s.replace(/[-/.\s]/g, "") === "020921",
+            placeholder: "DD-MM-YYYY"
         },
         {
-            title: "El Origen de tu Luz",
-            subtitle: "Solita, Caquetá (DD/MM/YYYY)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "11122010" || s.replace(/[-/.\s]/g, "") === "111210"
+            title: "El Latido de la Tierra",
+            subtitle: "Solita, Caquetá — El despertar de una nueva fuerza (DD/MM/AAAA)",
+            checker: s => s.replace(/[-/.\s]/g, "") === "11122010" || s.replace(/[-/.\s]/g, "") === "111210",
+            placeholder: "DD-MM-YYYY"
         },
         {
             title: "La Convergencia",
-            subtitle: "el día en que todo cambió (DD/MM/YYYY)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "13062025" || s.replace(/[-/.\s]/g, "") === "130625"
+            subtitle: "El instante infinito donde dos almas se volvieron una (DD/MM/AAAA)",
+            checker: s => s.replace(/[-/.\s]/g, "") === "13062025" || s.replace(/[-/.\s]/g, "") === "130625",
+            placeholder: "DD-MM-YYYY"
         },
         {
             title: "Las Seis Esencias",
-            subtitle: "amor, deseo, esperanza, vida, paz, tranquilidad",
+            subtitle: "Pronuncia las palabras que mantienen vivo este universo...",
             checker: s => {
                 const w = s.toLowerCase();
                 return w.includes("amor") && w.includes("deseo") && w.includes("esperanza") && w.includes("vida") && w.includes("paz") && w.includes("tranquilidad");
-            }
+            },
+            placeholder: "Amor, deseo, esperanza..."
         }
     ];
 
@@ -328,20 +333,20 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
                     </div>
                 </div>
             ) : (
-                <div key={step} style={{ textAlign: "center", maxWidth: 460, width: "100%", padding: "0 32px", zIndex: 10, animation: "fadeIn 0.8s ease forwards" }}>
-                    <div style={{ marginBottom: 48 }}>
-                        <div className="text-overline" style={{ color: ROSE, marginBottom: 12, opacity: 0.7 }}>Sello de Memoria {step + 1}/{puzzle.length}</div>
-                        <h2 style={{ fontSize: 32, fontStyle: "italic", color: "#E8E3DF", lineHeight: 1.3, marginBottom: 12 }}>
+                <div key={step} style={{ textAlign: "center", maxWidth: 500, width: "100%", padding: "0 32px", zIndex: 10, animation: "fadeIn 1.2s ease forwards" }}>
+                    <div style={{ marginBottom: 56 }}>
+                        <div className="text-overline" style={{ color: ROSE, marginBottom: 16, opacity: 0.8, letterSpacing: "0.5em" }}>Sello de Memoria {step + 1} de {puzzle.length}</div>
+                        <h2 style={{ fontSize: 38, fontStyle: "italic", color: "#E8E3DF", lineHeight: 1.2, marginBottom: 16, textShadow: "0 0 20px rgba(232,227,223,0.1)" }}>
                             {puzzle[step].title}
                         </h2>
-                        <p className="text-overline" style={{ color: "rgba(232,227,223,0.4)" }}>{puzzle[step].subtitle}</p>
+                        <p style={{ color: "rgba(232,227,223,0.5)", fontStyle: "italic", fontSize: 16, maxWidth: "80%", margin: "0 auto" }}>{puzzle[step].subtitle}</p>
                     </div>
 
                     <div style={{
-                        position: "relative", marginBottom: 24,
+                        position: "relative", marginBottom: 32,
                         animation: shake ? "none" : undefined,
                         transform: shake ? "translateX(-12px)" : undefined,
-                        transition: "transform 0.1s"
+                        transition: "all 0.1s"
                     }}>
                         <input
                             ref={inputRef}
@@ -349,36 +354,39 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
                             value={input}
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={e => e.key === "Enter" && handleSubmit()}
-                            placeholder={step === 0 ? "Tu nombre aquí..." : step < 4 ? "DD-MM-YYYY" : "Ingresa las esencias..."}
+                            placeholder={puzzle[step].placeholder}
                             style={{
-                                background: "rgba(255,255,255,0.02)",
-                                border: `1px solid ${shake ? "rgba(220,90,100,0.5)" : "rgba(255,255,255,0.1)"}`,
-                                borderRadius: 4,
+                                background: "rgba(255,255,255,0.01)",
+                                border: "none",
+                                borderBottom: `1px solid ${shake ? "rgba(220,90,100,0.5)" : "rgba(255,255,255,0.15)"}`,
+                                borderRadius: 0,
                                 color: "#E8E3DF",
                                 fontFamily: "'Cormorant Garamond', serif",
-                                fontSize: 26, fontStyle: "italic",
-                                padding: "20px 24px",
+                                fontSize: 28, fontStyle: "italic",
+                                padding: "16px 0",
                                 width: "100%", textAlign: "center",
-                                transition: "all 0.4s",
-                                outline: "none"
+                                transition: "all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                                outline: "none",
+                                letterSpacing: step === 0 ? "0" : "0.1em"
                             }}
                         />
+                        <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: input ? "100%" : "0%", height: 1, background: ROSE, transition: "width 0.8s ease" }} />
                     </div>
 
-                    <button onClick={handleSubmit} className="btn-primary theme-sara" style={{ width: "100%", marginBottom: 36, padding: "16px 0", fontSize: 12 }}>
+                    <button onClick={handleSubmit} className="btn-primary theme-sara" style={{ width: "100%", marginBottom: 40, padding: "20px 0", fontSize: 12, borderRadius: 30 }}>
                         Relevar Verdad
                     </button>
 
                     {step === 0 && (
-                        <React.Fragment>
-                            <div style={{ position: "relative", marginBottom: 36 }}>
-                                <div style={{ height: 1, background: "rgba(255,255,255,0.06)" }} />
-                                <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: DARK, padding: "0 16px", fontSize: 10, letterSpacing: "0.3em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>o</span>
+                        <div className="fade-in-slow" style={{ animationDelay: "1s" }}>
+                            <div style={{ position: "relative", marginBottom: 40, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)" }} />
+                                <span style={{ margin: "0 24px", fontSize: 10, letterSpacing: "0.4em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>U ORÁCULO EXTERNO</span>
                             </div>
-                            <button onClick={onRegularLogin} className="btn-ghost" style={{ width: "100%" }}>
-                                Acceder con cuenta
+                            <button onClick={onRegularLogin} className="btn-ghost" style={{ width: "100%", border: "none", fontSize: 11, textDecoration: "underline", textUnderlineOffset: "6px" }}>
+                                Acceder con cuenta existente
                             </button>
-                        </React.Fragment>
+                        </div>
                     )}
                 </div>
             )}
