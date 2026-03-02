@@ -755,22 +755,19 @@ const AiPanel = ({ isSara, memories, onClose }) => {
 };
 
 const callGemini = async (prompt, key) => {
-    // Ultra-robust endpoint/model rotation (v2.0/v2.5 prioritised)
+    // Focussed rotation based on project diagnostics (2.0/2.5)
     const combinations = [
         { ep: 'v1beta', mod: 'gemini-2.5-flash' },
         { ep: 'v1beta', mod: 'gemini-2.0-flash' },
-        { ep: 'v1beta', mod: 'gemini-2.0-flash-001' },
-        { ep: 'v1', mod: 'gemini-2.0-flash' },
-        { ep: 'v1beta', mod: 'gemini-1.5-flash-latest' },
-        { ep: 'v1beta', mod: 'gemini-1.5-flash' },
-        { ep: 'v1', mod: 'gemini-1.5-flash' }
+        { ep: 'v1beta', mod: 'gemini-2.0-flash-lite-preview-02-05' },
+        { ep: 'v1', mod: 'gemini-2.0-flash' }
     ];
 
     let lastError = null;
     for (const { ep, mod } of combinations) {
         const url = `https://generativelanguage.googleapis.com/${ep}/models/${mod}:generateContent?key=${key}`;
         try {
-            console.log(`Intentando Oráculo via ${mod} (${ep})...`);
+            console.log(`📡 Conectando con Oráculo ${mod} (${ep})...`);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -779,18 +776,23 @@ const callGemini = async (prompt, key) => {
                 })
             });
 
+            const data = await response.json();
+
             if (response.ok) {
-                const data = await response.json();
                 if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    console.log(`✨ Respuesta recibida via ${mod}`);
                     return data.candidates[0].content.parts[0].text;
+                } else {
+                    console.warn(`⚠️ Respuesta vacía de ${mod}:`, JSON.stringify(data));
+                    lastError = `[${mod}] Sin candidatos/Respuesta vacía. Posible filtro de seguridad.`;
                 }
             } else {
-                const err = await response.json();
-                lastError = `[${mod}] ${err.error?.message || response.statusText}`;
-                console.warn(`Gemini try failed:`, lastError);
+                lastError = `[${mod}] ${data.error?.message || response.statusText}`;
+                console.warn(`❌ Error en ${mod}:`, lastError);
             }
         } catch (e) {
             lastError = e.message;
+            console.warn(`💥 Excepción física en ${mod}:`, e.message);
         }
     }
 
