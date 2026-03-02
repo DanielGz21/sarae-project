@@ -247,55 +247,28 @@ const useAuth = () => {
         try { return JSON.parse(sessionStorage.getItem("vitae_session") || "null"); } catch { return null; }
     });
 
-    const [users, setUsers] = useState(() => {
-        const sara = { id: SECRET_KEY, name: SECRET_NAME, email: "sara@vitae.app", isSara: true };
-        const albert = { id: ALBERT_KEY, name: ALBERT_NAME, email: "albert@vitae.app", isSara: false, isAlbert: true };
-        try {
-            const stored = JSON.parse(localStorage.getItem("vitae_users") || "null");
-            if (!stored) {
-                const u = { [SECRET_KEY]: sara, [ALBERT_KEY]: albert };
-                localStorage.setItem("vitae_users", JSON.stringify(u));
-                return u;
-            }
-            if (!stored[SECRET_KEY]) stored[SECRET_KEY] = sara;
-            if (!stored[ALBERT_KEY]) stored[ALBERT_KEY] = albert;
-            return stored;
-        } catch { return { [SECRET_KEY]: sara, [ALBERT_KEY]: albert }; }
+    const [users] = useState({
+        [SECRET_KEY]: { id: SECRET_KEY, name: SECRET_NAME, isSara: true },
+        [ALBERT_KEY]: { id: ALBERT_KEY, name: ALBERT_NAME, isSara: false, isAlbert: true }
     });
-
-    const login = useCallback((email, password) => {
-        const found = Object.values(users).find(u => u.email === email && u.password === password);
-        if (!found) throw new Error("Credenciales incorrectas o inexistentes.");
-        const s = { ...found, loginAt: new Date().toISOString() };
-        setSession(s); sessionStorage.setItem("vitae_session", JSON.stringify(s));
-        return s;
-    }, [users]);
-
-    const register = useCallback((name, email, password) => {
-        if (Object.values(users).find(u => u.email === email)) throw new Error("El correo ya está en uso.");
-        const id = `user_${Date.now()}`;
-        const newUser = { id, name, email, password, isSara: false };
-        const updated = { ...users, [id]: newUser };
-        setUsers(updated); localStorage.setItem("vitae_users", JSON.stringify(updated));
-        const s = { ...newUser, loginAt: new Date().toISOString() };
-        setSession(s); sessionStorage.setItem("vitae_session", JSON.stringify(s));
-        return s;
-    }, [users]);
 
     const secretLogin = useCallback((userId) => {
         const found = users[userId];
         if (found) {
-            setSession(found);
-            sessionStorage.setItem("vitae_session", JSON.stringify(found));
-            return found;
+            const s = { ...found, loginAt: new Date().toISOString() };
+            setSession(s);
+            sessionStorage.setItem("vitae_session", JSON.stringify(s));
+            return s;
         }
     }, [users]);
 
     const logout = useCallback(() => {
-        setSession(null); sessionStorage.removeItem("vitae_session");
+        setSession(null);
+        sessionStorage.removeItem("vitae_session");
+        sessionStorage.clear(); // Complete wipe
     }, []);
 
-    return { session, login, register, secretLogin, logout };
+    return { session, secretLogin, logout };
 };
 
 // ─── ADVANCED ENIGMA ENTRY SCREEN ──────────────────────────────────────────────
@@ -318,7 +291,10 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
         },
         {
             title: "El Origen de su Luz",
-            subtitle: "Ciudad y Fecha — El día en que el cielo se tiñó (DD/MM/AAAA)",
+            subtitle: (firstValue) => {
+                const isSaraFlow = firstValue.toLowerCase().includes("sara");
+                return isSaraFlow ? "Medellín, Antioquia — El día en que el cielo se tiñó (DD/MM/AAAA)" : "Florencia, Caquetá — El día en que el cielo se tiñó (DD/MM/AAAA)";
+            },
             checker: (s, firstValue) => {
                 const isSaraFlow = firstValue.toLowerCase().includes("sara");
                 const val = s.replace(/[-/.\s]/g, "");
@@ -434,97 +410,12 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
                         Relevar Verdad
                     </button>
 
-                    {step === 0 && (
-                        <div className="fade-in-slow" style={{ animationDelay: "1s" }}>
-                            <div style={{ position: "relative", marginBottom: 40, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <div style={{ flex: 1, height: 1, background: "linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)" }} />
-                                <span style={{ margin: "0 24px", fontSize: 10, letterSpacing: "0.4em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>U ORÁCULO EXTERNO</span>
-                            </div>
-                            <button onClick={onRegularLogin} className="btn-ghost" style={{ width: "100%", border: "none", fontSize: 11, textDecoration: "underline", textUnderlineOffset: "6px" }}>
-                                Acceder con cuenta existente
-                            </button>
-                        </div>
-                    )}
                 </div>
             )}
         </div>
     );
 };
 
-// ─── AUTH MODAL (Login/Register) ──────────────────────────────────────────────
-const AuthModal = ({ onClose, onSuccess, login, register }) => {
-    const [mode, setMode] = useState("login");
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [pass, setPass] = useState("");
-    const [showPass, setShowPass] = useState(false);
-    const [err, setErr] = useState("");
-
-    const submit = () => {
-        setErr("");
-        try {
-            if (mode === "login") onSuccess(login(email, pass));
-            else onSuccess(register(name, email, pass));
-        } catch (e) { setErr(e.message); }
-    };
-
-    return (
-        <div className="overlay" onClick={onClose}>
-            <div className="glass-modal scale-in" style={{ maxWidth: 460, padding: "50px 40px" }} onClick={e => e.stopPropagation()}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 40 }}>
-                    <div>
-                        <p className="text-overline" style={{ color: "var(--gold-dim)", marginBottom: 12 }}>{APP_NAME} — ACCESO</p>
-                        <h2 style={{ fontSize: 32, fontStyle: "italic", color: "#E8E3DF" }}>
-                            {mode === "login" ? "Bienvenido de vuelta" : "Inicia tu historia"}
-                        </h2>
-                    </div>
-                    <button onClick={onClose} style={{ color: "var(--text-muted)", opacity: 0.7, padding: 4 }}><Icon name="close" size={20} /></button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 20, marginBottom: 32 }}>
-                    {mode === "register" && (
-                        <div>
-                            <label className="text-overline" style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>Nombre</label>
-                            <input className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre completo" />
-                        </div>
-                    )}
-                    <div>
-                        <label className="text-overline" style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>Correo</label>
-                        <input className="input-field" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="tu@correo.com" />
-                    </div>
-                    <div>
-                        <label className="text-overline" style={{ display: "block", marginBottom: 8, color: "var(--text-muted)" }}>Contraseña</label>
-                        <div style={{ position: "relative" }}>
-                            <input className="input-field" type={showPass ? "text" : "password"} value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="••••••••" style={{ paddingRight: 48 }} />
-                            <button
-                                onClick={() => setShowPass(!showPass)}
-                                style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }}>
-                                <Icon name="eye" size={16} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {err && (
-                        <div style={{ padding: "12px 16px", background: "rgba(220,90,100,0.1)", border: "1px solid rgba(220,90,100,0.2)", borderRadius: 4, marginBottom: 24 }}>
-                            <p style={{ fontSize: 14, color: "rgba(220,130,140,0.9)", fontStyle: "italic" }}>{err}</p>
-                        </div>
-                    )}
-
-                    <button onClick={submit} className="btn-primary theme-standard" style={{ width: "100%", marginBottom: 24 }}>
-                        {mode === "login" ? "Entrar a mi libro" : "Crear mi libro"}
-                    </button>
-
-                    <p style={{ fontSize: 13, color: "var(--text-muted)", textAlign: "center" }}>
-                        {mode === "login" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-                        <button onClick={() => setMode(mode === "login" ? "register" : "login")} style={{ color: "var(--gold)", textDecoration: "underline", marginLeft: 4 }}>
-                            {mode === "login" ? "Regístrate" : "Inicia sesión"}
-                        </button>
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // ─── RICH TEXT EDITOR ──────────────────────────────────────────────────────────
 const RichTextEditor = ({ value, onChange, themeAccent, onInteraction }) => {
@@ -617,7 +508,7 @@ const AddMemoryModal = ({ isSara, onClose, onAdd, setTyping }) => {
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-            .from('memories')
+            .from('media')
             .upload(filePath, fileToUpload);
 
         if (uploadError) {
@@ -625,7 +516,7 @@ const AddMemoryModal = ({ isSara, onClose, onAdd, setTyping }) => {
             return null;
         }
 
-        return getStorageUrl('memories', filePath);
+        return getStorageUrl('media', filePath);
     };
 
     const submit = async () => {
@@ -810,7 +701,7 @@ const AiPanel = ({ isSara, memories, onClose }) => {
             const reply = await callGemini(prompt, geminiKey);
             setMessages(prev => [...prev, { role: "oracle", text: reply }]);
         } catch (e) {
-            setMessages(prev => [...prev, { role: "oracle", text: "El éter está turbulento ahora mismo. Intenta preguntar de nuevo en un momento." }]);
+            setMessages(prev => [...prev, { role: "oracle", text: `Error del Oráculo: ${e.message}. Verifica tu API Key o la conexión.` }]);
         } finally {
             setLoading(false);
         }
@@ -860,24 +751,43 @@ const AiPanel = ({ isSara, memories, onClose }) => {
 };
 
 const callGemini = async (prompt, key) => {
-    // Switching to v1 endpoint for better stability in some regions
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-        })
-    });
+    // Ultra-robust endpoint/model rotation
+    const combinations = [
+        { ep: 'v1beta', mod: 'gemini-1.5-flash-latest' },
+        { ep: 'v1', mod: 'gemini-1.5-flash' },
+        { ep: 'v1beta', mod: 'gemini-1.5-flash' },
+        { ep: 'v1beta', mod: 'gemini-1.5-pro-latest' },
+        { ep: 'v1', mod: 'gemini-pro' }
+    ];
 
-    if (!response.ok) {
-        const errData = await response.json();
-        console.error("Gemini API Error details:", errData);
-        throw new Error(errData.error?.message || "Error en la conexión con el Oráculo");
+    let lastError = null;
+    for (const { ep, mod } of combinations) {
+        const url = `https://generativelanguage.googleapis.com/${ep}/models/${mod}:generateContent?key=${key}`;
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+                    return data.candidates[0].content.parts[0].text;
+                }
+            } else {
+                const err = await response.json();
+                lastError = `[${mod}] ${err.error?.message || response.statusText}`;
+                console.warn(`Gemini try failed:`, lastError);
+            }
+        } catch (e) {
+            lastError = e.message;
+        }
     }
 
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
+    throw new Error(lastError || "Todos los canales del Oráculo están obstruidos.");
 };
 
 // ─── MEMORY DETAIL MODAL ──────────────────────────────────────────────────────
@@ -1105,9 +1015,9 @@ const SantuarioView = ({ session, vaultKey, isSara, setUnreadCount }) => {
         try {
             const compressed = await compressImage(file);
             const path = `chat/${Date.now()}_${file.name}`;
-            const { error } = await supabase.storage.from('memories').upload(path, compressed);
+            const { error } = await supabase.storage.from('media').upload(path, compressed);
             if (!error) {
-                const publicUrl = getStorageUrl('memories', path);
+                const publicUrl = getStorageUrl('media', path);
                 await sendEcho(null, publicUrl);
             } else {
                 console.error("Storage Error:", error);
@@ -1555,12 +1465,12 @@ const VitaeApp = ({ session, logout }) => {
                             <Icon name="search" size={14} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                         </div>
 
-                        <button onClick={() => setAiOpen(true)} className={`nav-link ${themeClass}`} title="Oráculo">
-                            <Icon name="brain" size={18} />
+                        <button onClick={() => setAiOpen(true)} className={`nav-link ${themeClass}`} title="Oráculo" style={{ opacity: 1, color: themeAccent }}>
+                            <Icon name="brain" size={20} />
                             <span className="desktop-only" style={{ marginLeft: 8 }}>Oráculo</span>
                         </button>
 
-                        <button onClick={exportData} title="Exportar Copia de Seguridad" className="nav-link desktop-only" style={{ opacity: 0.6 }}>
+                        <button onClick={exportData} title="Exportar Copia de Seguridad" className="nav-link desktop-only" style={{ opacity: 0.8 }}>
                             <Icon name="note" size={18} />
                         </button>
 
@@ -1568,11 +1478,11 @@ const VitaeApp = ({ session, logout }) => {
                             <Icon name="music" size={18} color={audioPlaying ? themeAccent : "var(--text-muted)"} />
                         </button>
 
-                        <button onClick={() => setVaultOpen(true)} className="nav-link" title="Ajustes de la Bóveda" style={{ opacity: 0.8 }}>
-                            <Icon name="lock" size={18} />
+                        <button onClick={() => setVaultOpen(true)} className="nav-link" title="Ajustes de la Bóveda" style={{ opacity: 1, color: themeAccent }}>
+                            <Icon name="lock" size={20} />
                         </button>
 
-                        <button onClick={logout} className="nav-link" title="Cerrar sesión" style={{ opacity: 0.6 }}>
+                        <button onClick={logout} className="nav-link" title="Cerrar sesión" style={{ opacity: 0.8 }}>
                             <Icon name="logout" size={18} />
                         </button>
                     </div>
@@ -1807,31 +1717,16 @@ const VitaeApp = ({ session, logout }) => {
 
 // ─── ROOT CONTAINER ───────────────────────────────────────────────────────────
 export default function Root() {
-    const { session, login, register, secretLogin, logout } = useAuth();
+    const { session, secretLogin, logout } = useAuth();
     const [screen, setScreen] = useState("secret");
 
     useEffect(() => { if (session) setScreen("app"); }, [session]);
-
-    const handleSecret = () => {
-        secretLogin();
-        setScreen("app");
-    };
 
     if (screen === "app" && session) {
         return <VitaeApp session={session} logout={() => { logout(); setScreen("secret"); }} />;
     }
 
-    if (screen === "auth") {
-        return (
-            <div style={{ position: "relative", minHeight: "100vh", background: DARK }}>
-                <StarField density={50} />
-                <div className="grain" />
-                <AuthModal onClose={() => setScreen("secret")} onSuccess={() => setScreen("app")} login={login} register={register} />
-            </div>
-        );
-    }
-
-    return <SecretEntry onUnlock={secretLogin} onRegularLogin={() => setScreen("auth")} />;
+    return <SecretEntry onUnlock={secretLogin} onRegularLogin={() => { }} />;
 }
 
 const rootElement = document.getElementById("root");

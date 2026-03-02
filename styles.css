@@ -277,28 +277,30 @@ textarea {
 }
 
 .btn-primary.theme-sara {
-    background: linear-gradient(135deg, rgba(212, 144, 154, 0.12), rgba(212, 144, 154, 0.04));
-    border: 1px solid var(--border-rose);
-    color: var(--rose);
+    background: linear-gradient(135deg, rgba(212, 144, 154, 0.25), rgba(212, 144, 154, 0.1));
+    border: 1px solid rgba(212, 144, 154, 0.6);
+    color: #fff;
+    text-shadow: 0 0 10px rgba(212, 144, 154, 0.5);
 }
 
 .btn-primary.theme-sara:hover {
-    background: linear-gradient(135deg, rgba(212, 144, 154, 0.2), rgba(212, 144, 154, 0.08));
-    border-color: var(--rose-dim);
-    box-shadow: 0 4px 20px var(--rose-glow);
+    background: linear-gradient(135deg, rgba(212, 144, 154, 0.4), rgba(212, 144, 154, 0.2));
+    border-color: var(--rose);
+    box-shadow: 0 8px 25px rgba(212, 144, 154, 0.3);
     transform: translateY(-2px);
 }
 
 .btn-primary.theme-standard {
-    background: linear-gradient(135deg, rgba(201, 169, 110, 0.12), rgba(201, 169, 110, 0.04));
-    border: 1px solid var(--border-gold);
-    color: var(--gold);
+    background: linear-gradient(135deg, rgba(201, 169, 110, 0.25), rgba(201, 169, 110, 0.1));
+    border: 1px solid rgba(201, 169, 110, 0.6);
+    color: #fff;
+    text-shadow: 0 0 10px rgba(201, 169, 110, 0.5);
 }
 
 .btn-primary.theme-standard:hover {
-    background: linear-gradient(135deg, rgba(201, 169, 110, 0.2), rgba(201, 169, 110, 0.08));
-    border-color: var(--gold-dim);
-    box-shadow: 0 4px 20px var(--gold-glow);
+    background: linear-gradient(135deg, rgba(201, 169, 110, 0.4), rgba(201, 169, 110, 0.2));
+    border-color: var(--gold);
+    box-shadow: 0 8px 25px rgba(201, 169, 110, 0.3);
     transform: translateY(-2px);
 }
 
