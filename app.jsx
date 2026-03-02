@@ -1328,9 +1328,17 @@ const VitaeApp = ({ session, logout }) => {
 
         fetchMems();
 
-        // Global Chat Monitor for Notifications
-        let echoSub;
+        // Real-time synchronization
+        let memSub, echoSub;
         if (supabase) {
+            // Memory sync
+            memSub = supabase.channel('public:memories')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => {
+                    fetchMems();
+                })
+                .subscribe();
+
+            // Chat notifications sync
             echoSub = supabase.channel('global_echoes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'echoes' }, payload => {
                     if (payload.new.sender_id !== session.id) {
@@ -1340,7 +1348,7 @@ const VitaeApp = ({ session, logout }) => {
                                 name: payload.new.sender_name.split(" ")[0],
                                 text: payload.new.text ? decryptData(payload.new.text, vaultKey) : "Te envió una imagen"
                             });
-                            playEcho(); // Use the existing crystal sound
+                            playEcho();
                             if (navigator.vibrate) navigator.vibrate(200);
                             setTimeout(() => setLastNotif(null), 5000);
                         }
@@ -1350,7 +1358,7 @@ const VitaeApp = ({ session, logout }) => {
         }
 
         return () => {
-            if (subscription) supabase.removeChannel(subscription);
+            if (memSub) supabase.removeChannel(memSub);
             if (echoSub) supabase.removeChannel(echoSub);
         };
     }, [session.id, view, vaultKey]);
