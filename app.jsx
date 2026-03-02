@@ -306,7 +306,7 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
         {
             title: "El Latido de la Tierra",
             subtitle: "Solita, Caquetá — El despertar de una nueva fuerza (DD/MM/AAAA)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "11122010" || s.replace(/[-/.\s]/g, "") === "111210",
+            checker: s => s.replace(/[-/.\s]/g, "") === "11122009" || s.replace(/[-/.\s]/g, "") === "111209",
             placeholder: "DD-MM-YYYY"
         },
         {
@@ -1235,18 +1235,22 @@ const VitaeApp = ({ session, logout }) => {
     useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
 
     useEffect(() => {
-        // High quality ambient loop (Rain + Soft Piano)
-        audioRef.current = new Audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"); // Placeholder for real ambient, or use any reliable public URL
-        // A better choice for Sarah & Albert:
-        audioRef.current.src = "https://assets.mixkit.co/music/preview/mixkit-rain-and-thunder-1282.mp3";
+        // High quality ambient loop (Rain loop from a stable public CDN)
+        audioRef.current = new Audio("https://github.com/rafaelcastrocouto/audio/raw/master/rain.mp3");
         audioRef.current.loop = true;
         audioRef.current.volume = 0.4;
     }, []);
 
     const toggleAudio = () => {
         if (!audioRef.current) return;
-        if (audioPlaying) { audioRef.current.pause(); }
-        else { audioRef.current.play().catch(e => console.log("Audio not available")); }
+        if (audioPlaying) {
+            audioRef.current.pause();
+        } else {
+            audioRef.current.play().catch(e => {
+                console.warn("Audio playback failed or was blocked:", e);
+                // Note: Most browsers require a user interaction (click) before playing audio.
+            });
+        }
         setAudioPlaying(!audioPlaying);
     };
 
