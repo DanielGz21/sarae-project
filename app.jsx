@@ -755,19 +755,22 @@ const AiPanel = ({ isSara, memories, onClose }) => {
 };
 
 const callGemini = async (prompt, key) => {
-    // Ultra-robust endpoint/model rotation
+    // Ultra-robust endpoint/model rotation (v2.0/v2.5 prioritised)
     const combinations = [
+        { ep: 'v1beta', mod: 'gemini-2.5-flash' },
+        { ep: 'v1beta', mod: 'gemini-2.0-flash' },
+        { ep: 'v1beta', mod: 'gemini-2.0-flash-001' },
+        { ep: 'v1', mod: 'gemini-2.0-flash' },
         { ep: 'v1beta', mod: 'gemini-1.5-flash-latest' },
-        { ep: 'v1', mod: 'gemini-1.5-flash' },
         { ep: 'v1beta', mod: 'gemini-1.5-flash' },
-        { ep: 'v1beta', mod: 'gemini-1.5-pro-latest' },
-        { ep: 'v1', mod: 'gemini-pro' }
+        { ep: 'v1', mod: 'gemini-1.5-flash' }
     ];
 
     let lastError = null;
     for (const { ep, mod } of combinations) {
         const url = `https://generativelanguage.googleapis.com/${ep}/models/${mod}:generateContent?key=${key}`;
         try {
+            console.log(`Intentando Oráculo via ${mod} (${ep})...`);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1005,11 +1008,14 @@ const SantuarioView = ({ session, vaultKey, isSara, setUnreadCount }) => {
 
         const { error } = await supabase.from('echoes').insert([{
             text: text ? encryptData(text, vaultKey) : null,
-            media_url: mediaUrl, // Encrypting the URL itself is optional if the bucket is private, but let's keep it simple
+            media_url: mediaUrl,
             sender_id: session.id,
-            sender_name: session.name,
-            reactions: []
+            sender_name: session.name
         }]);
+
+        if (error) {
+            console.error("Echo Post Error:", error);
+        }
     };
 
     const handleImage = async (e) => {
