@@ -1004,12 +1004,15 @@ const SantuarioView = ({ session, vaultKey, isSara, setUnreadCount }) => {
     }, [messages, othersTyping]);
 
     const sendEcho = async (overrideText = null, mediaUrl = null) => {
-        const text = (overrideText || input).trim();
-        if (!text && !mediaUrl) return;
+        const textValue = (overrideText || input).trim();
+        if (!textValue && !mediaUrl) return;
         if (!overrideText && !mediaUrl) setInput("");
 
+        // Ensure text is never null to satisfy Supabase NOT NULL constraint
+        const encryptedText = encryptData(textValue || "", vaultKey);
+
         const { error } = await supabase.from('echoes').insert([{
-            text: text ? encryptData(text, vaultKey) : null,
+            text: encryptedText,
             media_url: mediaUrl,
             sender_id: session.id,
             sender_name: session.name

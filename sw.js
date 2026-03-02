@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sarae-v4';
+const CACHE_NAME = 'sarae-v5';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
