@@ -1151,12 +1151,13 @@ const VitaeApp = ({ session, logout }) => {
     };
 
     const handleAdd = async (m) => {
-        // Save to state immediately for UX
+        // Save to state immediately for UX (Optimistic UI)
+        const tempId = m.id;
         const newMems = [m, ...memories].sort((a, b) => new Date(b.date) - new Date(a.date));
         setMemories(newMems);
 
         if (supabase) {
-            const { error } = await supabase.from('memories').insert([{
+            const { data, error } = await supabase.from('memories').insert([{
                 date: m.date,
                 title: encryptData(m.title, vaultKey),
                 content: encryptData(m.content, vaultKey),
@@ -1165,8 +1166,20 @@ const VitaeApp = ({ session, logout }) => {
                 color: m.color,
                 media_url: m.media_url,
                 user_id: session.id
-            }]);
-            if (error) console.error("Error saving to Supabase:", error);
+            }]).select();
+
+            if (error) {
+                console.error("Error saving to Supabase:", error);
+            } else if (data && data[0]) {
+                // Update the memory in state with the real UUID from Supabase
+                const realMem = {
+                    ...data[0],
+                    title: m.title,
+                    content: m.content,
+                    excerpt: m.excerpt
+                };
+                setMemories(prev => prev.map(item => item.id === tempId ? realMem : item));
+            }
         } else {
             localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(newMems));
         }
@@ -1174,13 +1187,19 @@ const VitaeApp = ({ session, logout }) => {
 
     const handleDelete = async (id) => {
         setActiveId(null);
+        // Optimistic delete
+        const remaining = memories.filter(m => m.id !== id);
+        setMemories(remaining);
+
         if (supabase) {
-            const { error } = await supabase.from('memories').delete().eq('id', id);
-            if (error) console.error("Error deleting from Supabase:", error);
+            // Only try to delete from DB if ID is a valid UUID (usually contains -)
+            const isUuid = typeof id === 'string' && id.includes('-');
+            if (isUuid) {
+                const { error } = await supabase.from('memories').delete().eq('id', id);
+                if (error) console.error("Error deleting from Supabase:", error);
+            }
         } else {
-            const newMems = memories.filter(x => x.id !== id);
-            setMemories(newMems);
-            localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(newMems));
+            localStorage.setItem(`vitae_mem_${session.id}`, JSON.stringify(remaining));
         }
     };
 
