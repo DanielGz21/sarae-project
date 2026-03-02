@@ -1236,7 +1236,7 @@ const VitaeApp = ({ session, logout }) => {
 
     useEffect(() => {
         // High quality ambient loop (Rain loop from a stable public CDN)
-        audioRef.current = new Audio("https://github.com/rafaelcastrocouto/audio/raw/master/rain.mp3");
+        audioRef.current = new Audio("https://raw.githubusercontent.com/rafaelcastrocouto/audio/master/rain.mp3");
         audioRef.current.loop = true;
         audioRef.current.volume = 0.4;
     }, []);
