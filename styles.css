@@ -461,30 +461,37 @@ h4 {
 
 @media (max-width: 640px) {
     .timeline-line {
-        left: 40px;
+        left: 20px;
     }
 
     .timeline-row {
         flex-direction: column;
-        gap: 16px !important;
-        padding: 24px 0 !important;
+        gap: 12px !important;
+        padding: 20px 0 !important;
     }
 
     .timeline-date {
         width: auto !important;
         text-align: left !important;
-        padding-left: 64px;
+        padding-left: 40px;
     }
 
     .timeline-node {
         position: absolute;
-        left: 35px;
-        top: 28px;
+        left: 15px;
+        top: 24px;
     }
 
     .memory-card {
         max-width: 100% !important;
-        margin-left: 10px;
+        margin-left: 0;
+        padding: 20px;
+    }
+
+    /* Hero Responsive Text */
+    main h1 {
+        font-size: 38px !important;
+        line-height: 1.1 !important;
     }
 }
 
@@ -805,27 +812,38 @@ h4 {
     }
 
     main.container {
-        padding-bottom: 110px !important;
+        padding-bottom: 120px !important;
+        padding-top: 30px !important;
     }
 
     .header-content {
-        flex-direction: column;
-        gap: 20px;
-        align-items: flex-start !important;
+        height: 64px !important;
+        padding: 0 16px !important;
     }
 
     .header-actions {
-        width: 100%;
-        justify-content: space-between;
+        display: none !important;
+        /* Managed by mobile nav */
     }
 
-    .search-input {
-        width: 100% !important;
-        max-width: 200px;
+    .desktop-nav-items {
+        display: none !important;
     }
 
-    .audio-btn {
-        width: 36px;
-        height: 36px;
+    /* Secret entry mobile tweaks */
+    #root>div[style*="background: rgb(10, 7, 8)"] h2 {
+        font-size: 26px !important;
+    }
+
+    #root>div[style*="background: rgb(10, 7, 8)"] input {
+        font-size: 22px !important;
+    }
+
+    .mobile-modal-padding {
+        padding: 20px !important;
+    }
+
+    .atlas-graph-card {
+        height: 320px !important;
     }
 }

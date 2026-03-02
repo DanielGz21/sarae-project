@@ -887,11 +887,11 @@ const MemoryDetail = ({ memory, isSara, onClose, onDelete }) => {
                     </div>
                 </div>
 
-                <div style={{ padding: "40px" }}>
-                    <p className="text-overline" style={{ color: memory.color, marginBottom: 12, marginLeft: 65 }}>
+                <div className="mobile-modal-padding" style={{ padding: "40px" }}>
+                    <p className="text-overline" style={{ color: memory.color, marginBottom: 12 }}>
                         {new Date(memory.date).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                     </p>
-                    <h2 style={{ fontSize: 38, fontStyle: "italic", color: "#E8E3DF", marginBottom: 32 }}>{memory.title}</h2>
+                    <h2 style={{ fontSize: "clamp(24px, 5vw, 38px)", fontStyle: "italic", color: "#E8E3DF", marginBottom: 32 }}>{memory.title}</h2>
 
                     <div
                         className="rich-text-content fade-in"
@@ -961,7 +961,7 @@ const AtlasView = ({ memories, isSara }) => {
                 </div>
             </div>
 
-            <div className="memory-card" style={{ padding: 0, height: 480, overflow: "hidden", position: "relative" }}>
+            <div className="memory-card atlas-graph-card" style={{ padding: 0, height: 480, overflow: "hidden", position: "relative" }}>
                 <div style={{ position: "absolute", inset: 0, opacity: 0.2, backgroundImage: `url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='grid' width='40' height='40' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 40 0 L 0 0 0 40' fill='none' stroke='${isSara ? '%23D4909A' : '%23C9A96E'}' stroke-width='0.5' stroke-opacity='0.2'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23grid)'/%3E%3C/svg%3E")` }} />
 
                 <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
