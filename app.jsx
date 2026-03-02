@@ -998,9 +998,105 @@ const AtlasView = ({ memories, isSara }) => {
     );
 };
 
+// ─── SANTUARIO DE ECOS (ENCRYPTED CHAT) ───────────────────────────────────────
+const SantuarioView = ({ session, vaultKey, isSara }) => {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState("");
+    const [loading, setLoading] = useState(true);
+    const scrollRef = useRef(null);
+    const themeAccent = isSara ? "var(--rose)" : "var(--gold)";
+    const themeClass = isSara ? "theme-sara" : "theme-standard";
+
+    const fetchEchoes = async () => {
+        if (!supabase) return;
+        const { data, error } = await supabase
+            .from('echoes')
+            .select('*')
+            .order('created_at', { ascending: true })
+            .limit(100);
+
+        if (data) {
+            const decrypted = data.map(m => ({
+                ...m,
+                text: decryptData(m.text, vaultKey)
+            }));
+            setMessages(decrypted);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchEchoes();
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+
+        const channel = supabase.channel('santuario_realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'echoes' }, payload => {
+                const newMsg = {
+                    ...payload.new,
+                    text: decryptData(payload.new.text, vaultKey)
+                };
+                setMessages(prev => [...prev, newMsg]);
+            })
+            .subscribe();
+
+        return () => { channel.unsubscribe(); };
+    }, []);
+
+    useEffect(() => {
+        if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, [messages]);
+
+    const sendEcho = async () => {
+        const text = input.trim();
+        if (!text || !supabase) return;
+        setInput("");
+
+        const encrypted = encryptData(text, vaultKey);
+        const { error } = await supabase.from('echoes').insert([{
+            text: encrypted,
+            sender_id: session.id,
+            sender_name: session.name
+        }]);
+
+        if (error) console.error("Echo error:", error);
+    };
+
+    return (
+        <div className="santuario-view fade-in">
+            <div className="echo-messages" ref={scrollRef}>
+                {loading ? (
+                    <div style={{ textAlign: "center", padding: 40, opacity: 0.4 }}>Conectando con el éter...</div>
+                ) : messages.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 40, opacity: 0.4, fontStyle: "italic" }}>El santuario está en silencio. Inicia un eco.</div>
+                ) : messages.map((m, i) => (
+                    <div key={m.id || i} className={`echo-bubble ${m.sender_id === session.id ? 'me' : 'them'}`}>
+                        <div className="echo-text">{m.text}</div>
+                        <span className="echo-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                ))}
+            </div>
+
+            <div className="echo-input-container">
+                <input
+                    className="input-field"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && sendEcho()}
+                    placeholder="Escribe un eco cifrado..."
+                    style={{ border: "none", background: "transparent", fontSize: 16 }}
+                />
+                <button onClick={sendEcho} style={{ color: themeAccent }}>
+                    <Icon name="send" size={20} />
+                </button>
+            </div>
+        </div>
+    );
+};
+
 // ─── MAIN APP VIEW ────────────────────────────────────────────────────────────
 const VitaeApp = ({ session, logout }) => {
     const isSara = session.isSara;
+
     const themeClass = isSara ? "theme-sara" : "theme-standard";
     const themeAccent = isSara ? "var(--rose)" : "var(--gold)";
 
@@ -1139,8 +1235,12 @@ const VitaeApp = ({ session, logout }) => {
     useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
 
     useEffect(() => {
-        audioRef.current = new Audio("data:audio/mp3;base64,");
+        // High quality ambient loop (Rain + Soft Piano)
+        audioRef.current = new Audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"); // Placeholder for real ambient, or use any reliable public URL
+        // A better choice for Sarah & Albert:
+        audioRef.current.src = "https://assets.mixkit.co/music/preview/mixkit-rain-and-thunder-1282.mp3";
         audioRef.current.loop = true;
+        audioRef.current.volume = 0.4;
     }, []);
 
     const toggleAudio = () => {
@@ -1275,8 +1375,8 @@ const VitaeApp = ({ session, logout }) => {
                     </nav>
 
                     <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        {["timeline", "galería", "atlas"].map(v => (
-                            <button key={v} onClick={() => setView(v)} className={`nav-link ${view === v ? "active" : ""}`} style={{ marginRight: 8 }}>{v}</button>
+                        {["timeline", "galería", "atlas", "santuario"].map(v => (
+                            <button key={v} onClick={() => setView(v)} className={`nav-link ${view === v ? "active" : ""}`} style={{ marginRight: 8 }}>{v === 'santuario' ? 'Santuario' : v}</button>
                         ))}
 
                         <div style={{ position: "relative" }}>
@@ -1429,6 +1529,8 @@ const VitaeApp = ({ session, logout }) => {
                 {/* ── ATLAS VIEW ── */}
                 {!loading && view === "atlas" && <AtlasView memories={filtered} isSara={isSara} />}
 
+                {!loading && view === "santuario" && <SantuarioView session={session} vaultKey={vaultKey} isSara={isSara} />}
+
             </main>
 
             {/* FAB */}
@@ -1450,19 +1552,16 @@ const VitaeApp = ({ session, logout }) => {
                     <Icon name="note" size={20} />
                     <span className="mobile-nav-text">Memoria</span>
                 </button>
-                <button className={`mobile-nav-btn ${view === 'galería' ? `active ${themeClass}` : ''}`} onClick={() => setView("galería")}>
-                    <Icon name="photo" size={20} />
-                    <span className="mobile-nav-text">Galería</span>
+                <button className={`mobile-nav-btn ${view === 'santuario' ? `active ${themeClass}` : ''}`} onClick={() => setView("santuario")}>
+                    <Icon name="brain" size={20} />
+                    <span className="mobile-nav-text">Santuario</span>
                 </button>
-
-                {/* Large Center Floating Add Button */}
                 <button className={`mobile-nav-add-btn ${themeClass}`} onClick={() => setAddOpen(true)}>
                     <Icon name="plus" size={24} />
                 </button>
-
-                <button className="mobile-nav-btn" onClick={() => setAiOpen(true)}>
-                    <Icon name="brain" size={20} />
-                    <span className="mobile-nav-text">Oráculo</span>
+                <button className={`mobile-nav-btn ${view === 'galería' ? `active ${themeClass}` : ''}`} onClick={() => setView("galería")}>
+                    <Icon name="photo" size={20} />
+                    <span className="mobile-nav-text">Galería</span>
                 </button>
                 <button className={`mobile-nav-btn ${view === 'atlas' ? `active ${themeClass}` : ''}`} onClick={() => setView("atlas")}>
                     <Icon name="chart" size={20} />
