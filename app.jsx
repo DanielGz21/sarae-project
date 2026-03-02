@@ -3,8 +3,8 @@ const { useState, useEffect, useRef, useCallback } = React;
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const SECRET_NAME = "Sara Correa Montes";
 const SECRET_KEY = "sara_correa_montes_vitae_2026";
-const ALBERT_NAME = "Albert Gaviria";
-const ALBERT_KEY = "albert_gaviria_vitae_2026";
+const ALBERT_NAME = "Albert Galvis";
+const ALBERT_KEY = "albert_galvis_vitae_2026";
 const APP_NAME = "SARÆ";
 const GOLD = "#C9A96E";
 const ROSE = "#D4909A";
@@ -1016,37 +1016,48 @@ const AtlasView = ({ memories, isSara }) => {
     );
 };
 
-// ─── SANTUARIO DE ECOS ULTRA (PREMIUM CHAT V2) ───────────────────────────────
-const SantuarioView = ({ session, vaultKey, isSara }) => {
+// ─── SANTUARIO DE ECOS V3 (PREMIUM + NOTIFICATIONS) ─────────────────────────
+const SantuarioView = ({ session, vaultKey, isSara, setUnreadCount }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
-    const [isTyping, setIsTyping] = useState(false);
     const [othersTyping, setOthersTyping] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const scrollRef = useRef(null);
     const themeAccent = isSara ? "var(--rose)" : "var(--gold)";
     const themeClass = isSara ? "theme-sara" : "theme-standard";
 
     const EMOJIS = ["✨", "❤️", "🌹", "🌿", "🔥", "🫂", "🌙", "💍", "♾️"];
 
+    // Reset unread count when opening this view
+    useEffect(() => { setUnreadCount(0); }, []);
+
     const fetchEchoes = async () => {
         if (!supabase) return;
         const { data, error } = await supabase.from('echoes').select('*').order('created_at', { ascending: true }).limit(150);
         if (data) {
-            setMessages(data.map(m => ({ ...m, text: decryptData(m.text, vaultKey), reactions: m.reactions || [] })));
+            setMessages(data.map(m => ({
+                ...m,
+                text: m.text ? decryptData(m.text, vaultKey) : "",
+                reactions: m.reactions || []
+            })));
         }
         setLoading(false);
     };
 
     useEffect(() => {
         fetchEchoes();
-        const channel = supabase.channel('santuario_v2')
+        const channel = supabase.channel('santuario_v3')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'echoes' }, payload => {
                 if (payload.eventType === 'INSERT') {
-                    const msg = { ...payload.new, text: decryptData(payload.new.text, vaultKey), reactions: payload.new.reactions || [] };
+                    const msg = {
+                        ...payload.new,
+                        text: payload.new.text ? decryptData(payload.new.text, vaultKey) : "",
+                        reactions: payload.new.reactions || []
+                    };
                     setMessages(prev => [...prev.filter(x => x.id !== msg.id), msg]);
                 } else if (payload.eventType === 'UPDATE') {
-                    setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, text: decryptData(payload.new.text, vaultKey), reactions: payload.new.reactions || [] } : m));
+                    setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, text: payload.new.text ? decryptData(payload.new.text, vaultKey) : "", reactions: payload.new.reactions || [] } : m));
                 }
             })
             .on('broadcast', { event: 'typing' }, ({ payload }) => {
@@ -1064,17 +1075,34 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
         if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages, othersTyping]);
 
-    const sendEcho = async (overrideText = null) => {
+    const sendEcho = async (overrideText = null, mediaUrl = null) => {
         const text = (overrideText || input).trim();
-        if (!text || !supabase) return;
-        if (!overrideText) setInput("");
+        if (!text && !mediaUrl) return;
+        if (!overrideText && !mediaUrl) setInput("");
 
         const { error } = await supabase.from('echoes').insert([{
-            text: encryptData(text, vaultKey),
+            text: text ? encryptData(text, vaultKey) : null,
+            media_url: mediaUrl, // Encrypting the URL itself is optional if the bucket is private, but let's keep it simple
             sender_id: session.id,
             sender_name: session.name,
             reactions: []
         }]);
+    };
+
+    const handleImage = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !supabase) return;
+        setUploading(true);
+        try {
+            const compressed = await compressImage(file);
+            const path = `chat/${Date.now()}_${file.name}`;
+            const { data, error } = await supabase.storage.from('memories').upload(path, compressed);
+            if (data) {
+                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
+                await sendEcho(null, publicUrl);
+            }
+        } catch (err) { console.error("Upload error:", err); }
+        setUploading(false);
     };
 
     const addReaction = async (msgId, emoji) => {
@@ -1089,22 +1117,28 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
     };
 
     const handleTyping = () => {
-        supabase.channel('santuario_v2').send({ type: 'broadcast', event: 'typing', payload: { uid: session.id } });
+        supabase.channel('santuario_v3').send({ type: 'broadcast', event: 'typing', payload: { uid: session.id } });
     };
 
     return (
         <div className="santuario-view fade-in">
+            <div className="chat-aura-bg" />
             <div className="echo-messages" ref={scrollRef}>
                 {messages.map((m, i) => {
                     const isMe = m.sender_id === session.id;
                     return (
-                        <div key={m.id || i} className={`echo-bubble ${isMe ? 'me' : 'them'}`} style={{ position: "relative" }}>
+                        <div key={m.id || i} className={`echo-bubble ${isMe ? 'me' : 'them'}`}>
                             <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 4, display: isMe ? 'none' : 'block' }}>{m.sender_name.split(" ")[0]}</div>
-                            <div className="echo-text">{m.text}</div>
+
+                            {m.media_url && (
+                                <img src={m.media_url} className="chat-img" onClick={() => window.open(m.media_url, '_blank')} />
+                            )}
+
+                            {m.text && <div className="echo-text">{m.text}</div>}
 
                             {m.reactions?.length > 0 && (
                                 <div className="reactions-pill">
-                                    {m.reactions.map((r, idx) => <span key={idx}>{r.emoji}</span>)}
+                                    {m.reactions.map((r, idx) => <span key={idx} title={m.sender_name}>{r.emoji}</span>)}
                                 </div>
                             )}
 
@@ -1113,7 +1147,10 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
                                     <button key={e} onClick={() => addReaction(m.id, e)}>{e}</button>
                                 ))}
                             </div>
-                            <span className="echo-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: 6 }}>
+                                <span className="echo-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                {isMe && <span className="echo-status-hint">✦</span>}
+                            </div>
                         </div>
                     );
                 })}
@@ -1127,6 +1164,10 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
             <div className="echo-controls">
                 <div className="emoji-bar">
                     {EMOJIS.map(e => <button key={e} onClick={() => sendEcho(e)}>{e}</button>)}
+                    <label className="chat-upload-btn" style={{ marginLeft: 'auto' }}>
+                        <Icon name="photo" size={18} style={{ opacity: uploading ? 0.3 : 1 }} />
+                        <input type="file" accept="image/*" onChange={handleImage} style={{ display: 'none' }} disabled={uploading} />
+                    </label>
                 </div>
                 <div className="echo-input-container">
                     <input
@@ -1134,7 +1175,7 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
                         value={input}
                         onChange={e => { setInput(e.target.value); handleTyping(); }}
                         onKeyDown={e => e.key === 'Enter' && sendEcho()}
-                        placeholder="Cifra un pensamiento..."
+                        placeholder="Escribe un secreto..."
                         style={{ border: "none", background: "transparent", fontSize: 16 }}
                     />
                     <button onClick={() => sendEcho()} style={{ color: themeAccent }}>
@@ -1166,6 +1207,8 @@ const VitaeApp = ({ session, logout }) => {
     const [othersTyping, setOthersTyping] = useState(false);
     const [isTyping, setIsTyping] = useState(false);
     const [pingActive, setPingActive] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [lastNotif, setLastNotif] = useState(null);
     const [vaultKey, setVaultKey] = useState(localStorage.getItem('sarae_vault_key') || "");
     const [geminiKey, setGeminiKey] = useState(localStorage.getItem('sarae_gemini_key') || "");
     const [vaultOpen, setVaultOpen] = useState(false);
@@ -1180,21 +1223,26 @@ const VitaeApp = ({ session, logout }) => {
         audioRef.current.volume = 0.4;
     }, []);
 
-    // ─── AUDIO ENGINE (CRYSTAL ECHO) ──────────────────────────────────────────
+    // ─── AUDIO ENGINE (CRYSTAL ECHO V2) ──────────────────────────────────────
     const playEcho = () => {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = 'sine';
+            // Bipolar crystalline tone (A5 -> D6)
             osc.frequency.setValueAtTime(880, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 1);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
+            osc.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.1);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 1.2);
+
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start();
-            osc.stop(ctx.currentTime + 1);
+            osc.stop(ctx.currentTime + 1.5);
         } catch (e) { }
     };
 
@@ -1280,19 +1328,32 @@ const VitaeApp = ({ session, logout }) => {
 
         fetchMems();
 
-        // Real-time subscription
-        let subscription;
+        // Global Chat Monitor for Notifications
+        let echoSub;
         if (supabase) {
-            subscription = supabase
-                .channel('public:memories')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, payload => {
-                    fetchMems();
+            echoSub = supabase.channel('global_echoes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'echoes' }, payload => {
+                    if (payload.new.sender_id !== session.id) {
+                        if (view !== 'santuario') {
+                            setUnreadCount(prev => prev + 1);
+                            setLastNotif({
+                                name: payload.new.sender_name.split(" ")[0],
+                                text: payload.new.text ? decryptData(payload.new.text, vaultKey) : "Te envió una imagen"
+                            });
+                            playEcho(); // Use the existing crystal sound
+                            if (navigator.vibrate) navigator.vibrate(200);
+                            setTimeout(() => setLastNotif(null), 5000);
+                        }
+                    }
                 })
                 .subscribe();
         }
 
-        return () => { if (subscription) supabase.removeChannel(subscription); };
-    }, [session.id]);
+        return () => {
+            if (subscription) supabase.removeChannel(subscription);
+            if (echoSub) supabase.removeChannel(echoSub);
+        };
+    }, [session.id, view, vaultKey]);
 
     useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
 
@@ -1410,6 +1471,21 @@ const VitaeApp = ({ session, logout }) => {
                 </div>
             )}
 
+            {/* In-app Message Notification */}
+            {lastNotif && (
+                <div
+                    className={`glass-modal slide-up ${themeClass}`}
+                    onClick={() => setView("santuario")}
+                    style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1000, padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", border: `1px solid ${themeAccent}` }}
+                >
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: themeAccent, boxShadow: `0 0 10px ${themeAccent}` }} />
+                    <div>
+                        <span style={{ fontSize: 10, opacity: 0.6, display: "block" }}>Nuevo Eco de {lastNotif.name}</span>
+                        <span style={{ fontSize: 14, fontStyle: "italic" }}>{lastNotif.text.slice(0, 40)}{lastNotif.text.length > 40 ? '...' : ''}</span>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header style={{ position: "relative", zIndex: 50, borderBottom: "1px solid var(--border-subtle)", background: "rgba(10,7,8,0.6)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
                 <div className="container header-content" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 80 }}>
@@ -1442,7 +1518,12 @@ const VitaeApp = ({ session, logout }) => {
 
                     <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: 16 }}>
                         {["timeline", "galería", "atlas", "santuario"].map(v => (
-                            <button key={v} onClick={() => setView(v)} className={`nav-link ${view === v ? "active" : ""}`} style={{ marginRight: 8 }}>{v === 'santuario' ? 'Santuario' : v}</button>
+                            <button key={v} onClick={() => setView(v)} className={`nav-link ${view === v ? "active" : ""}`} style={{ marginRight: 8, position: "relative" }}>
+                                {v === 'santuario' ? 'Santuario' : v}
+                                {v === 'santuario' && unreadCount > 0 && (
+                                    <span className="unread-badge">{unreadCount}</span>
+                                )}
+                            </button>
                         ))}
 
                         <div style={{ position: "relative" }}>
@@ -1595,7 +1676,7 @@ const VitaeApp = ({ session, logout }) => {
                 {/* ── ATLAS VIEW ── */}
                 {!loading && view === "atlas" && <AtlasView memories={filtered} isSara={isSara} />}
 
-                {!loading && view === "santuario" && <SantuarioView session={session} vaultKey={vaultKey} isSara={isSara} />}
+                {!loading && view === "santuario" && <SantuarioView session={session} vaultKey={vaultKey} isSara={isSara} setUnreadCount={setUnreadCount} />}
 
             </main>
 
@@ -1618,9 +1699,10 @@ const VitaeApp = ({ session, logout }) => {
                     <Icon name="note" size={20} />
                     <span className="mobile-nav-text">Memoria</span>
                 </button>
-                <button className={`mobile-nav-btn ${view === 'santuario' ? `active ${themeClass}` : ''}`} onClick={() => setView("santuario")}>
+                <button className={`mobile-nav-btn ${view === 'santuario' ? `active ${themeClass}` : ''}`} onClick={() => setView("santuario")} style={{ position: "relative" }}>
                     <Icon name="brain" size={20} />
                     <span className="mobile-nav-text">Santuario</span>
+                    {unreadCount > 0 && <span className="unread-badge-mobile">{unreadCount}</span>}
                 </button>
                 <button className={`mobile-nav-add-btn ${themeClass}`} onClick={() => setAddOpen(true)}>
                     <Icon name="plus" size={24} />
