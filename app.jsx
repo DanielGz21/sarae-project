@@ -30,6 +30,40 @@ const decryptData = (text, key) => {
     } catch (e) { return "Error de Descifrado"; }
 };
 
+// ─── UTILITIES: IMAGE COMPRESSION ──────────────────────────────────────────
+const compressImage = (file) => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 1200;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                } else {
+                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
+                }, "image/jpeg", 0.7); // 70% quality jpeg
+            };
+        };
+    });
+};
+
 const INITIAL_MEMORIES = [
     { id: 1, date: "2026-01-14", title: "Un nuevo comienzo", type: "photo", tags: ["vida", "sueños"], excerpt: "El amanecer tiñó el cielo de un rosa suave. Sé que este año será diferente.", color: "#D4909A" },
     { id: 2, date: "2025-11-08", title: "Café en la montaña", type: "note", tags: ["paz"], excerpt: "A veces solo necesitas alejarte para escuchar tu propia voz. El viento frío, el aroma a café.", color: "#E0B0B6" },
@@ -470,7 +504,7 @@ const AuthModal = ({ onClose, onSuccess, login, register }) => {
 };
 
 // ─── RICH TEXT EDITOR ──────────────────────────────────────────────────────────
-const RichTextEditor = ({ value, onChange, themeAccent }) => {
+const RichTextEditor = ({ value, onChange, themeAccent, onInteraction }) => {
     const editorRef = useRef(null);
 
     // Initial content setup
@@ -479,40 +513,6 @@ const RichTextEditor = ({ value, onChange, themeAccent }) => {
             editorRef.current.innerHTML = value;
         }
     }, []);
-
-    // ─── UTILITIES: IMAGE COMPRESSION ──────────────────────────────────────────
-    const compressImage = (file) => {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement("canvas");
-                    const MAX_WIDTH = 1200;
-                    const MAX_HEIGHT = 1200;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                    } else {
-                        if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext("2d");
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    canvas.toBlob((blob) => {
-                        resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
-                    }, "image/jpeg", 0.7); // 70% quality jpeg
-                };
-            };
-        });
-    };
 
     const exec = (command) => {
         document.execCommand(command, false, null);
@@ -545,9 +545,9 @@ const RichTextEditor = ({ value, onChange, themeAccent }) => {
                 <div
                     ref={editorRef}
                     contentEditable
-                    onInput={e => { onChange(e.currentTarget.innerHTML); if (props.onInteraction) props.onInteraction(); }}
+                    onInput={e => { onChange(e.currentTarget.innerHTML); if (onInteraction) onInteraction(); }}
                     onBlur={e => { onChange(e.currentTarget.innerHTML); }}
-                    onFocus={() => { if (props.onInteraction) props.onInteraction(); }}
+                    onFocus={() => { if (onInteraction) onInteraction(); }}
                     placeholder="Escribe lo que quieras recordar. Selecciona el texto y usa los controles arriba para dar formato avanzado..."
                     className="rich-text-content"
                     style={{
