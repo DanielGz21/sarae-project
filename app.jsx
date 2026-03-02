@@ -32,6 +32,11 @@ const decryptData = (text, key) => {
     } catch (e) { return "Error de Descifrado"; }
 };
 
+const getStorageUrl = (bucket, path) => {
+    if (!path) return null;
+    return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+};
+
 // ─── UTILITIES: IMAGE COMPRESSION ──────────────────────────────────────────
 const compressImage = (file) => {
     return new Promise((resolve) => {
@@ -611,8 +616,8 @@ const AddMemoryModal = ({ isSara, onClose, onAdd, setTyping }) => {
         const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
-            .from('media')
+        const { error: uploadError } = await supabase.storage
+            .from('memories')
             .upload(filePath, fileToUpload);
 
         if (uploadError) {
@@ -620,11 +625,7 @@ const AddMemoryModal = ({ isSara, onClose, onAdd, setTyping }) => {
             return null;
         }
 
-        const { data: { publicUrl } } = supabase.storage
-            .from('media')
-            .getPublicUrl(filePath);
-
-        return publicUrl;
+        return getStorageUrl('memories', filePath);
     };
 
     const submit = async () => {
@@ -1096,10 +1097,12 @@ const SantuarioView = ({ session, vaultKey, isSara, setUnreadCount }) => {
         try {
             const compressed = await compressImage(file);
             const path = `chat/${Date.now()}_${file.name}`;
-            const { data, error } = await supabase.storage.from('memories').upload(path, compressed);
-            if (data) {
-                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
+            const { error } = await supabase.storage.from('memories').upload(path, compressed);
+            if (!error) {
+                const publicUrl = getStorageUrl('memories', path);
                 await sendEcho(null, publicUrl);
+            } else {
+                console.error("Storage Error:", error);
             }
         } catch (err) { console.error("Upload error:", err); }
         setUploading(false);
@@ -1554,6 +1557,10 @@ const VitaeApp = ({ session, logout }) => {
 
                         <button onClick={toggleAudio} className={`audio-btn ${audioPlaying ? 'playing' : ''}`} title="Lluvia / Ambiente">
                             <Icon name="music" size={16} color={audioPlaying ? themeAccent : "var(--text-muted)"} />
+                        </button>
+
+                        <button onClick={() => setVaultOpen(true)} style={{ color: "var(--text-muted)", opacity: 0.6, marginLeft: 8 }} title="Ajustes de la Bóveda">
+                            <Icon name="lock" size={18} />
                         </button>
 
                         <button onClick={logout} style={{ color: "var(--text-muted)", opacity: 0.6, marginLeft: 8 }} title="Cerrar sesión">
