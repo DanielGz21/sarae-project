@@ -3,6 +3,8 @@ const { useState, useEffect, useRef, useCallback } = React;
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const SECRET_NAME = "Sara Correa Montes";
 const SECRET_KEY = "sara_correa_montes_vitae_2026";
+const ALBERT_NAME = "Albert Gaviria";
+const ALBERT_KEY = "albert_gaviria_vitae_2026";
 const APP_NAME = "SARÆ";
 const GOLD = "#C9A96E";
 const ROSE = "#D4909A";
@@ -242,12 +244,18 @@ const useAuth = () => {
 
     const [users, setUsers] = useState(() => {
         const sara = { id: SECRET_KEY, name: SECRET_NAME, email: "sara@vitae.app", isSara: true };
+        const albert = { id: ALBERT_KEY, name: ALBERT_NAME, email: "albert@vitae.app", isSara: false, isAlbert: true };
         try {
             const stored = JSON.parse(localStorage.getItem("vitae_users") || "null");
-            if (!stored) { const u = { [SECRET_KEY]: sara }; localStorage.setItem("vitae_users", JSON.stringify(u)); return u; }
+            if (!stored) {
+                const u = { [SECRET_KEY]: sara, [ALBERT_KEY]: albert };
+                localStorage.setItem("vitae_users", JSON.stringify(u));
+                return u;
+            }
             if (!stored[SECRET_KEY]) stored[SECRET_KEY] = sara;
+            if (!stored[ALBERT_KEY]) stored[ALBERT_KEY] = albert;
             return stored;
-        } catch { return { [SECRET_KEY]: sara }; }
+        } catch { return { [SECRET_KEY]: sara, [ALBERT_KEY]: albert }; }
     });
 
     const login = useCallback((email, password) => {
@@ -269,11 +277,14 @@ const useAuth = () => {
         return s;
     }, [users]);
 
-    const secretLogin = useCallback(() => {
-        const sara = { id: SECRET_KEY, name: SECRET_NAME, email: "sara@vitae.app", isSara: true };
-        setSession(sara); sessionStorage.setItem("vitae_session", JSON.stringify(sara));
-        return sara;
-    }, []);
+    const secretLogin = useCallback((userId) => {
+        const found = users[userId];
+        if (found) {
+            setSession(found);
+            sessionStorage.setItem("vitae_session", JSON.stringify(found));
+            return found;
+        }
+    }, [users]);
 
     const logout = useCallback(() => {
         setSession(null); sessionStorage.removeItem("vitae_session");
@@ -289,51 +300,58 @@ const SecretEntry = ({ onUnlock, onRegularLogin }) => {
     const [shake, setShake] = useState(false);
     const inputRef = useRef(null);
 
-    // Advanced 5-stage enigma unlock sequence tailored for Sara and Albert
+    // Dual-identity riddle system
     const puzzle = [
         {
             title: "¿Quién custodia esta esencia?",
-            subtitle: "Invoca tu nombre completo para despertar el éter...",
-            checker: s => s.toLowerCase().replace(/\s+/g, "") === "saracorreamontes",
+            subtitle: "Escribe tu nombre para desvelar tu destino...",
+            checker: s => {
+                const n = s.toLowerCase().replace(/\s+/g, "");
+                return n === "saracorreamontes" || n === "albertgalvis";
+            },
             placeholder: "Tu nombre aquí..."
         },
         {
             title: "El Origen de su Luz",
-            subtitle: "Medellín, Antioquia — El día en que el cielo se tiñó de rosa (DD/MM/AAAA)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "21092002" || s.replace(/[-/.\s]/g, "") === "210902" || s.replace(/[-/.\s]/g, "") === "020921",
-            placeholder: "DD-MM-YYYY"
-        },
-        {
-            title: "El Latido de la Tierra",
-            subtitle: "Florencia, Caquetá — El despertar de una nueva fuerza (DD/MM/AAAA)",
-            checker: s => s.replace(/[-/.\s]/g, "") === "11122009" || s.replace(/[-/.\s]/g, "") === "111209",
+            subtitle: "Ciudad y Fecha — El día en que el cielo se tiñó (DD/MM/AAAA)",
+            checker: (s, firstValue) => {
+                const isSaraFlow = firstValue.toLowerCase().includes("sara");
+                const val = s.replace(/[-/.\s]/g, "");
+                if (isSaraFlow) return val === "21092002" || val === "210902";
+                return val === "11122009" || val === "111209"; // Albert's date
+            },
             placeholder: "DD-MM-YYYY"
         },
         {
             title: "La Convergencia",
-            subtitle: "El instante infinito donde dos almas se volvieron una (DD/MM/AAAA)",
+            subtitle: "El instante infinito donde dos almas se unieron (DD/MM/AAAA)",
             checker: s => s.replace(/[-/.\s]/g, "") === "13062025" || s.replace(/[-/.\s]/g, "") === "130625",
             placeholder: "DD-MM-YYYY"
         },
         {
             title: "Las Seis Esencias",
-            subtitle: "Pronuncia las palabras que mantienen vivo este universo...",
+            subtitle: "Amor, Deseo, Esperanza, Vida, Paz, Tranquilidad",
             checker: s => {
                 const w = s.toLowerCase();
-                return w.includes("amor") && w.includes("deseo") && w.includes("esperanza") && w.includes("vida") && w.includes("paz") && w.includes("tranquilidad");
+                return ["amor", "deseo", "esperanza", "vida", "paz", "tranquilidad"].every(e => w.includes(e));
             },
-            placeholder: "Amor, deseo, esperanza..."
+            placeholder: "Las 6 palabras..."
         }
     ];
 
+    const [firstInput, setFirstInput] = useState("");
+
     const handleSubmit = () => {
         if (step >= puzzle.length) return;
-        if (puzzle[step].checker(input)) {
-            const next = step + 1;
-            setStep(next);
-            setInput("");
-            if (next === puzzle.length) {
-                setTimeout(onUnlock, 4000); // Bloom sequence
+        if (step === 0) setFirstInput(input);
+
+        if (puzzle[step].checker(input, firstInput)) {
+            if (step === puzzle.length - 1) {
+                const userId = firstInput.toLowerCase().includes("sara") ? SECRET_KEY : ALBERT_KEY;
+                onUnlock(userId);
+            } else {
+                setStep(step + 1);
+                setInput("");
             }
         } else {
             setShake(true);
@@ -813,7 +831,7 @@ const AiPanel = ({ isSara, memories, onClose }) => {
 
                 <div ref={chatRef} className="chat-container fade-in-slow" style={{ flex: 1 }}>
                     {messages.map((m, i) => (
-                        <div key={i} className={`chat-bubble ${m.role} ${m.role === 'oracle' ? themeClass : ''}`}>
+                        <div key={m.id || i} className={`chat-bubble ${m.role} ${m.role === 'oracle' ? themeClass : ''}`}>
                             {m.text.split('\n').map((line, j) => <React.Fragment key={j}>{line}<br /></React.Fragment>)}
                         </div>
                     ))}
@@ -998,44 +1016,44 @@ const AtlasView = ({ memories, isSara }) => {
     );
 };
 
-// ─── SANTUARIO DE ECOS (ENCRYPTED CHAT) ───────────────────────────────────────
+// ─── SANTUARIO DE ECOS ULTRA (PREMIUM CHAT V2) ───────────────────────────────
 const SantuarioView = ({ session, vaultKey, isSara }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
+    const [isTyping, setIsTyping] = useState(false);
+    const [othersTyping, setOthersTyping] = useState(false);
     const scrollRef = useRef(null);
     const themeAccent = isSara ? "var(--rose)" : "var(--gold)";
     const themeClass = isSara ? "theme-sara" : "theme-standard";
 
+    const EMOJIS = ["✨", "❤️", "🌹", "🌿", "🔥", "🫂", "🌙", "💍", "♾️"];
+
     const fetchEchoes = async () => {
         if (!supabase) return;
-        const { data, error } = await supabase
-            .from('echoes')
-            .select('*')
-            .order('created_at', { ascending: true })
-            .limit(100);
-
+        const { data, error } = await supabase.from('echoes').select('*').order('created_at', { ascending: true }).limit(150);
         if (data) {
-            const decrypted = data.map(m => ({
-                ...m,
-                text: decryptData(m.text, vaultKey)
-            }));
-            setMessages(decrypted);
+            setMessages(data.map(m => ({ ...m, text: decryptData(m.text, vaultKey), reactions: m.reactions || [] })));
         }
         setLoading(false);
     };
 
     useEffect(() => {
         fetchEchoes();
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-
-        const channel = supabase.channel('santuario_realtime')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'echoes' }, payload => {
-                const newMsg = {
-                    ...payload.new,
-                    text: decryptData(payload.new.text, vaultKey)
-                };
-                setMessages(prev => [...prev, newMsg]);
+        const channel = supabase.channel('santuario_v2')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'echoes' }, payload => {
+                if (payload.eventType === 'INSERT') {
+                    const msg = { ...payload.new, text: decryptData(payload.new.text, vaultKey), reactions: payload.new.reactions || [] };
+                    setMessages(prev => [...prev.filter(x => x.id !== msg.id), msg]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setMessages(prev => prev.map(m => m.id === payload.new.id ? { ...payload.new, text: decryptData(payload.new.text, vaultKey), reactions: payload.new.reactions || [] } : m));
+                }
+            })
+            .on('broadcast', { event: 'typing' }, ({ payload }) => {
+                if (payload.uid !== session.id) {
+                    setOthersTyping(true);
+                    setTimeout(() => setOthersTyping(false), 3000);
+                }
             })
             .subscribe();
 
@@ -1044,50 +1062,85 @@ const SantuarioView = ({ session, vaultKey, isSara }) => {
 
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, othersTyping]);
 
-    const sendEcho = async () => {
-        const text = input.trim();
+    const sendEcho = async (overrideText = null) => {
+        const text = (overrideText || input).trim();
         if (!text || !supabase) return;
-        setInput("");
+        if (!overrideText) setInput("");
 
-        const encrypted = encryptData(text, vaultKey);
         const { error } = await supabase.from('echoes').insert([{
-            text: encrypted,
+            text: encryptData(text, vaultKey),
             sender_id: session.id,
-            sender_name: session.name
+            sender_name: session.name,
+            reactions: []
         }]);
+    };
 
-        if (error) console.error("Echo error:", error);
+    const addReaction = async (msgId, emoji) => {
+        const msg = messages.find(m => m.id === msgId);
+        if (!msg) return;
+        const newReactions = [...(msg.reactions || [])];
+        const existing = newReactions.findIndex(r => r.uid === session.id);
+        if (existing >= 0) newReactions[existing].emoji = emoji;
+        else newReactions.push({ uid: session.id, emoji });
+
+        await supabase.from('echoes').update({ reactions: newReactions }).eq('id', msgId);
+    };
+
+    const handleTyping = () => {
+        supabase.channel('santuario_v2').send({ type: 'broadcast', event: 'typing', payload: { uid: session.id } });
     };
 
     return (
         <div className="santuario-view fade-in">
             <div className="echo-messages" ref={scrollRef}>
-                {loading ? (
-                    <div style={{ textAlign: "center", padding: 40, opacity: 0.4 }}>Conectando con el éter...</div>
-                ) : messages.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: 40, opacity: 0.4, fontStyle: "italic" }}>El santuario está en silencio. Inicia un eco.</div>
-                ) : messages.map((m, i) => (
-                    <div key={m.id || i} className={`echo-bubble ${m.sender_id === session.id ? 'me' : 'them'}`}>
-                        <div className="echo-text">{m.text}</div>
-                        <span className="echo-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                {messages.map((m, i) => {
+                    const isMe = m.sender_id === session.id;
+                    return (
+                        <div key={m.id || i} className={`echo-bubble ${isMe ? 'me' : 'them'}`} style={{ position: "relative" }}>
+                            <div style={{ fontSize: 10, opacity: 0.5, marginBottom: 4, display: isMe ? 'none' : 'block' }}>{m.sender_name.split(" ")[0]}</div>
+                            <div className="echo-text">{m.text}</div>
+
+                            {m.reactions?.length > 0 && (
+                                <div className="reactions-pill">
+                                    {m.reactions.map((r, idx) => <span key={idx}>{r.emoji}</span>)}
+                                </div>
+                            )}
+
+                            <div className="echo-hover-actions">
+                                {EMOJIS.slice(0, 5).map(e => (
+                                    <button key={e} onClick={() => addReaction(m.id, e)}>{e}</button>
+                                ))}
+                            </div>
+                            <span className="echo-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    );
+                })}
+                {othersTyping && (
+                    <div className="echo-bubble them typing-bubble">
+                        <div className="typing-dots"><span></span><span></span><span></span></div>
                     </div>
-                ))}
+                )}
             </div>
 
-            <div className="echo-input-container">
-                <input
-                    className="input-field"
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && sendEcho()}
-                    placeholder="Escribe un eco cifrado..."
-                    style={{ border: "none", background: "transparent", fontSize: 16 }}
-                />
-                <button onClick={sendEcho} style={{ color: themeAccent }}>
-                    <Icon name="send" size={20} />
-                </button>
+            <div className="echo-controls">
+                <div className="emoji-bar">
+                    {EMOJIS.map(e => <button key={e} onClick={() => sendEcho(e)}>{e}</button>)}
+                </div>
+                <div className="echo-input-container">
+                    <input
+                        className="input-field"
+                        value={input}
+                        onChange={e => { setInput(e.target.value); handleTyping(); }}
+                        onKeyDown={e => e.key === 'Enter' && sendEcho()}
+                        placeholder="Cifra un pensamiento..."
+                        style={{ border: "none", background: "transparent", fontSize: 16 }}
+                    />
+                    <button onClick={() => sendEcho()} style={{ color: themeAccent }}>
+                        <Icon name="send" size={20} />
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -1117,6 +1170,15 @@ const VitaeApp = ({ session, logout }) => {
     const [geminiKey, setGeminiKey] = useState(localStorage.getItem('sarae_gemini_key') || "");
     const [vaultOpen, setVaultOpen] = useState(false);
     const audioRef = useRef(null);
+
+    useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
+
+    useEffect(() => {
+        // High quality ambient loop (Archive.org)
+        audioRef.current = new Audio("https://archive.org/download/RainSoundEffectsHD/Long%20-%20Sound%20Effect%2001.mp3");
+        audioRef.current.loop = true;
+        audioRef.current.volume = 0.4;
+    }, []);
 
     // ─── AUDIO ENGINE (CRYSTAL ECHO) ──────────────────────────────────────────
     const playEcho = () => {
@@ -1235,8 +1297,8 @@ const VitaeApp = ({ session, logout }) => {
     useEffect(() => { const t = setTimeout(() => setGreeting(false), 4500); return () => clearTimeout(t); }, []);
 
     useEffect(() => {
-        // High quality ambient loop (Rain loop from a stable public CDN)
-        audioRef.current = new Audio("https://raw.githubusercontent.com/rafaelcastrocouto/audio/master/rain.mp3");
+        // Higher reliability ambient source (Archive.org Permanent Link)
+        audioRef.current = new Audio("https://archive.org/download/RainSoundEffectsHD/Long%20-%20Sound%20Effect%2001.mp3");
         audioRef.current.loop = true;
         audioRef.current.volume = 0.4;
     }, []);
@@ -1663,7 +1725,7 @@ export default function Root() {
         );
     }
 
-    return <SecretEntry onUnlock={handleSecret} onRegularLogin={() => setScreen("auth")} />;
+    return <SecretEntry onUnlock={secretLogin} onRegularLogin={() => setScreen("auth")} />;
 }
 
 const rootElement = document.getElementById("root");
