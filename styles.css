@@ -822,8 +822,15 @@ h4 {
     }
 
     .header-actions {
+        display: flex !important;
+        gap: 8px !important;
+    }
+
+    /* Hide redundant nav links and search in header on mobile */
+    .header-actions .nav-link:not([title="Oráculo"]):not([title="Ajustes de la Bóveda"]):not([title="Cerrar sesión"]),
+    .header-actions .search-input,
+    .header-actions div[style*="position: relative"] {
         display: none !important;
-        /* Managed by mobile nav */
     }
 
     .desktop-nav-items {
@@ -1206,5 +1213,16 @@ h4 {
 
     .echo-bubble {
         max-width: 90%;
+    }
+}
+
+.desktop-only {
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .desktop-only {
+        display: none !important;
     }
 }

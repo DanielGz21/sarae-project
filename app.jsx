@@ -860,7 +860,8 @@ const AiPanel = ({ isSara, memories, onClose }) => {
 };
 
 const callGemini = async (prompt, key) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    // Switching to v1 endpoint for better stability in some regions
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`;
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -868,6 +869,13 @@ const callGemini = async (prompt, key) => {
             contents: [{ parts: [{ text: prompt }] }]
         })
     });
+
+    if (!response.ok) {
+        const errData = await response.json();
+        console.error("Gemini API Error details:", errData);
+        throw new Error(errData.error?.message || "Error en la conexión con el Oráculo");
+    }
+
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
 };
@@ -1547,23 +1555,24 @@ const VitaeApp = ({ session, logout }) => {
                             <Icon name="search" size={14} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
                         </div>
 
-                        <button onClick={() => setAiOpen(true)} className={`btn-primary ${themeClass} desktop-nav-items`} style={{ padding: "8px 16px", borderRadius: 30 }}>
-                            <Icon name="brain" size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: 6 }} /> Oráculo
+                        <button onClick={() => setAiOpen(true)} className={`nav-link ${themeClass}`} title="Oráculo">
+                            <Icon name="brain" size={18} />
+                            <span className="desktop-only" style={{ marginLeft: 8 }}>Oráculo</span>
                         </button>
 
-                        <button onClick={exportData} title="Exportar Copia de Seguridad" style={{ color: "var(--text-muted)", opacity: 0.6, marginLeft: 8 }} className="desktop-nav-items">
-                            <Icon name="note" size={16} />
+                        <button onClick={exportData} title="Exportar Copia de Seguridad" className="nav-link desktop-only" style={{ opacity: 0.6 }}>
+                            <Icon name="note" size={18} />
                         </button>
 
                         <button onClick={toggleAudio} className={`audio-btn ${audioPlaying ? 'playing' : ''}`} title="Lluvia / Ambiente">
-                            <Icon name="music" size={16} color={audioPlaying ? themeAccent : "var(--text-muted)"} />
+                            <Icon name="music" size={18} color={audioPlaying ? themeAccent : "var(--text-muted)"} />
                         </button>
 
-                        <button onClick={() => setVaultOpen(true)} style={{ color: "var(--text-muted)", opacity: 0.6, marginLeft: 8 }} title="Ajustes de la Bóveda">
+                        <button onClick={() => setVaultOpen(true)} className="nav-link" title="Ajustes de la Bóveda" style={{ opacity: 0.8 }}>
                             <Icon name="lock" size={18} />
                         </button>
 
-                        <button onClick={logout} style={{ color: "var(--text-muted)", opacity: 0.6, marginLeft: 8 }} title="Cerrar sesión">
+                        <button onClick={logout} className="nav-link" title="Cerrar sesión" style={{ opacity: 0.6 }}>
                             <Icon name="logout" size={18} />
                         </button>
                     </div>
